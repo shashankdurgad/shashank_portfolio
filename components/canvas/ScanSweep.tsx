@@ -15,15 +15,11 @@ export function ScanSweep() {
   const ref = useRef<THREE.Group>(null);
   const depth = (STOPS.length + 1) * STOP_SPACING;
 
+  // A floor-level bar, not a full frame: a closed rectangle spanning the bay
+  // reads as a stray box drifting across the viewport rather than a scan.
   const points = useMemo(() => {
     const halfW = 15;
-    return [
-      new THREE.Vector3(-halfW, -1.34, 0),
-      new THREE.Vector3(halfW, -1.34, 0),
-      new THREE.Vector3(halfW, 3.2, 0),
-      new THREE.Vector3(-halfW, 3.2, 0),
-      new THREE.Vector3(-halfW, -1.34, 0),
-    ];
+    return [new THREE.Vector3(-halfW, -1.33, 0), new THREE.Vector3(halfW, -1.33, 0)];
   }, []);
 
   useFrame(({ clock }) => {

@@ -47,24 +47,30 @@ export const STOPS = buildStops();
 /** Distance along -Z between consecutive stops. */
 export const STOP_SPACING = 14;
 
-/** The hoist sits at the bay centre; the camera tracks past it. */
-export const HOIST_POSITION = new THREE.Vector3(0, 0.6, 0);
+/**
+ * The hoist travels with the camera, hanging just ahead and to the right of
+ * the reading column so it stays framed the whole way down the bay without
+ * ever sitting behind the text.
+ */
+export const HOIST_OFFSET = new THREE.Vector3(4.4, 0.35, -7.5);
 
-/** Wall panels live to the camera's left, angled inward. */
-export const WALL_X = -6.2;
+/** Wall panels live to the camera's left, facing back toward the aisle. */
+export const WALL_X = -7.4;
 export const WALL_Y = 1.9;
+/** Panels face +X (toward the camera aisle), tilted slightly inward. */
+export const WALL_ROT_Y = Math.PI / 2;
 
 /**
- * Camera waypoints, one per stop, with a gentle lateral weave so the
- * dolly never feels like a straight rail.
+ * Camera waypoints, one per stop. The camera runs straight down the aisle at
+ * a constant height; lateral drift is small so the HTML column stays stable.
  */
 export function buildWaypoints(stops: Stop[] = STOPS): THREE.Vector3[] {
   return stops.map((stop, i) => {
     const z = -i * STOP_SPACING;
-    // Weave toward the wall on wall-facing stops, back to centre otherwise.
+    // Ease toward the wall when a panel is the subject of the section.
     const wallFacing = stop.section === "experience" || stop.section === "projects";
-    const x = wallFacing ? -1.6 : 0.35 * Math.sin(i * 1.1);
-    const y = 1.75 + 0.22 * Math.cos(i * 0.9);
+    const x = wallFacing ? -1.1 : 0.2 * Math.sin(i * 1.1);
+    const y = 1.7 + 0.14 * Math.cos(i * 0.9);
     return new THREE.Vector3(x, y, z);
   });
 }
@@ -96,7 +102,9 @@ export function stopProgress(index: number, total = STOPS.length): number {
  * falling to 0 by the time the neighbouring stop is reached.
  */
 export function focusFor(index: number, progress: number, total = STOPS.length): number {
-  const span = total <= 1 ? 1 : 1 / (total - 1);
+  // 1.6 stops of falloff — panels bloom in before they're centred and fade
+  // out after, so the wall never pops.
+  const span = (total <= 1 ? 1 : 1 / (total - 1)) * 1.6;
   const d = Math.abs(progress - stopProgress(index, total));
   return Math.max(0, 1 - d / span);
 }

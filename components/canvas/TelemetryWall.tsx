@@ -7,30 +7,35 @@ import * as THREE from "three";
 import type { ReadoutSpec } from "@/content/types";
 import { projects } from "@/content/projects";
 import { roles } from "@/content/resume";
-import { STOPS, STOP_SPACING, WALL_X, WALL_Y, focusFor } from "@/lib/constants";
+import {
+  STOPS,
+  STOP_SPACING,
+  WALL_ROT_Y,
+  WALL_X,
+  WALL_Y,
+  focusFor,
+} from "@/lib/constants";
 import { scroll } from "@/lib/scrollStore";
 import { resolveReadout } from "./readouts";
 import { ACCENT_HEX } from "./readouts/primitives";
 
 /**
- * Every stop that carries a readout, paired with its spec.
- * Derived from the content arrays — a new project appears here for free.
+ * Only stops backed by real content get a wall panel — an empty frame beside
+ * the hero reads as stray geometry, not instrumentation.
+ * Derived from the content arrays, so a new project appears here for free.
  */
 function wallPanels() {
-  return STOPS.map((stop, index) => {
-    let spec: ReadoutSpec | null = null;
-    if (stop.section === "projects") spec = projects[stop.item]?.readout ?? null;
-    if (stop.section === "experience") spec = roles[stop.item]?.readout ?? null;
-    // Non-content stops still get a readout so the wall is never empty.
-    if (!spec) {
-      const fallback: ReadoutSpec[] = [
-        { kind: "scatter", accent: "cyan", density: 0.6, seed: 3 },
-        { kind: "waveform", accent: "cyan", density: 0.5, seed: 7 },
-      ];
-      spec = fallback[index % fallback.length];
-    }
-    return { stop, spec, index };
+  const panels: { spec: ReadoutSpec; index: number }[] = [];
+  STOPS.forEach((stop, index) => {
+    const spec =
+      stop.section === "projects"
+        ? projects[stop.item]?.readout
+        : stop.section === "experience"
+          ? roles[stop.item]?.readout
+          : null;
+    if (spec) panels.push({ spec, index });
   });
+  return panels;
 }
 
 /** Bracket frame drawn around each panel — the schematic chrome. */
@@ -106,7 +111,7 @@ function Panel({
   );
 
   return (
-    <group ref={group} position={[WALL_X, WALL_Y, z]} rotation={[0, Math.PI / 2.6, 0]}>
+    <group ref={group} position={[WALL_X, WALL_Y, z]} rotation={[0, WALL_ROT_Y, 0]}>
       <PanelFrame color={ACCENT_HEX[accent]} opacity={0.5} />
       <group ref={inner} scale={0.42}>
         <Readout {...readoutProps} />

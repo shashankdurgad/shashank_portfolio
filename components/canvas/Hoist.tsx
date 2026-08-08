@@ -4,8 +4,11 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
+import { CAMERA_CURVE, HOIST_OFFSET } from "@/lib/constants";
 import { scroll } from "@/lib/scrollStore";
 import { rng } from "./readouts/primitives";
+
+const tmp = new THREE.Vector3();
 
 /**
  * The machine on the hoist: a wireframe assembly at the bay centre.
@@ -54,9 +57,15 @@ export function Hoist({ detail }: { detail: "high" | "low" }) {
     const p = scroll.progress;
 
     if (group.current) {
+      // Ride along the camera curve so the machine stays framed the whole way
+      // down the bay, offset to the right of the reading column.
+      CAMERA_CURVE.getPointAt(THREE.MathUtils.clamp(p, 0, 1), tmp);
+      tmp.add(HOIST_OFFSET);
+      tmp.y += Math.sin(t * 0.6) * 0.08;
+      group.current.position.lerp(tmp, Math.min(1, dt * 2.6));
+
       // Slow idle rotation, accelerating slightly as you move through the bay.
       group.current.rotation.y += dt * (0.12 + p * 0.25);
-      group.current.position.y = 0.6 + Math.sin(t * 0.6) * 0.06;
     }
 
     if (coreRef.current) {
@@ -66,8 +75,9 @@ export function Hoist({ detail }: { detail: "high" | "low" }) {
       });
     }
 
-    // Exploded view peaks mid-scroll, reassembling toward the end.
-    const explode = Math.sin(Math.min(1, Math.max(0, p)) * Math.PI) * 1.15;
+    // Starts assembled, peels apart through the middle of the bay, and
+    // reassembles by the end — the machine is intact when you arrive.
+    const explode = Math.sin(THREE.MathUtils.clamp(p, 0, 1) * Math.PI) * 1.5;
     shells.forEach((s, i) => {
       const g = shellRefs.current[i];
       if (!g) return;
@@ -106,13 +116,15 @@ export function Hoist({ detail }: { detail: "high" | "low" }) {
             shellRefs.current[i] = el;
           }}
         >
-          <mesh>
-            <icosahedronGeometry args={[s.size, i === 0 ? 1 : 0]} />
+          {/* Octahedra read as machined housings; icosahedra turn to noise
+              at this scale. */}
+          <mesh rotation={[s.spin, s.spin * 1.7, 0]}>
+            <octahedronGeometry args={[s.size, 0]} />
             <meshBasicMaterial
-              color="#7dd3fc"
+              color={i === 0 ? "#22d3ee" : "#7dd3fc"}
               wireframe
               transparent
-              opacity={0.14 + (shellCount - i) * 0.035}
+              opacity={0.3 - i * 0.045}
             />
           </mesh>
         </group>
