@@ -4,7 +4,7 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
-import type { ReadoutSpec } from "@/content/types";
+import type { ReadoutProps, ReadoutSpec } from "@/content/types";
 import { projects } from "@/content/projects";
 import { roles } from "@/content/resume";
 import {
@@ -19,13 +19,15 @@ import { scroll } from "@/lib/scrollStore";
 import { resolveReadout } from "./readouts";
 import { ACCENT_HEX } from "./readouts/primitives";
 
+type ReadoutComponent = React.ComponentType<ReadoutProps>;
+
 /**
  * Only stops backed by real content get a wall panel — an empty frame beside
  * the hero reads as stray geometry, not instrumentation.
  * Derived from the content arrays, so a new project appears here for free.
  */
 function wallPanels() {
-  const panels: { spec: ReadoutSpec; index: number }[] = [];
+  const panels: { spec: ReadoutSpec; index: number; Readout: ReadoutComponent }[] = [];
   STOPS.forEach((stop, index) => {
     const spec =
       stop.section === "projects"
@@ -33,10 +35,15 @@ function wallPanels() {
         : stop.section === "experience"
           ? roles[stop.item]?.readout
           : null;
-    if (spec) panels.push({ spec, index });
+    // Resolve the component here, at module scope, rather than during render:
+    // these are existing registry entries, not components created per-frame.
+    if (spec) panels.push({ spec, index, Readout: resolveReadout(spec) });
   });
   return panels;
 }
+
+/** Resolved once at module load — the content arrays are static. */
+const PANELS = wallPanels();
 
 /** Bracket frame drawn around each panel — the schematic chrome. */
 function PanelFrame({ color, opacity }: { color: string; opacity: number }) {
@@ -65,14 +72,15 @@ function PanelFrame({ color, opacity }: { color: string; opacity: number }) {
 
 function Panel({
   spec,
+  Readout,
   index,
   z,
 }: {
   spec: ReadoutSpec;
+  Readout: ReadoutComponent;
   index: number;
   z: number;
 }) {
-  const Readout = useMemo(() => resolveReadout(spec), [spec]);
   const accent = spec.accent ?? "cyan";
   const group = useRef<THREE.Group>(null);
   const inner = useRef<THREE.Group>(null);
@@ -121,12 +129,18 @@ function Panel({
 }
 
 export function TelemetryWall({ maxPanels }: { maxPanels: number }) {
-  const panels = useMemo(() => wallPanels().slice(0, maxPanels), [maxPanels]);
+  const panels = useMemo(() => PANELS.slice(0, maxPanels), [maxPanels]);
 
   return (
     <group>
-      {panels.map(({ spec, index }) => (
-        <Panel key={index} spec={spec} index={index} z={-index * STOP_SPACING} />
+      {panels.map(({ spec, Readout, index }) => (
+        <Panel
+          key={index}
+          spec={spec}
+          Readout={Readout}
+          index={index}
+          z={-index * STOP_SPACING}
+        />
       ))}
     </group>
   );

@@ -31,6 +31,19 @@ export function ScrollController() {
       gsap.ticker.add(raf);
       gsap.ticker.lagSmoothing(0);
 
+      // Route in-page anchors through Lenis, or native jumps fight the
+      // smoothed scroll and land in the wrong place.
+      const onClick = (e: MouseEvent) => {
+        const anchor = (e.target as HTMLElement)?.closest?.('a[href^="#"]');
+        const href = anchor?.getAttribute("href");
+        if (!href || href === "#") return;
+        const target = document.querySelector(href);
+        if (!target) return;
+        e.preventDefault();
+        lenis.scrollTo(target as HTMLElement, { offset: 0, duration: 1.1 });
+      };
+      document.addEventListener("click", onClick);
+
       const trigger = ScrollTrigger.create({
         trigger: "#main",
         start: "top top",
@@ -43,6 +56,7 @@ export function ScrollController() {
       });
 
       return () => {
+        document.removeEventListener("click", onClick);
         trigger.kill();
         gsap.ticker.remove(raf);
         lenis.destroy();
