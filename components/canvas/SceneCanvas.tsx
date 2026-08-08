@@ -6,7 +6,7 @@ import { Preload } from "@react-three/drei";
 import * as THREE from "three";
 import { BUDGET, useQuality } from "@/lib/quality";
 import { BayFloor } from "./BayFloor";
-import { Hoist } from "./Hoist";
+import { Lorenz } from "./Lorenz";
 import { ProgressBridge } from "./ProgressBridge";
 import { Rig } from "./Rig";
 import { ScanSweep } from "./ScanSweep";
@@ -19,7 +19,7 @@ function Bay({ tier }: { tier: "high" | "low" }) {
       <fog attach="fog" args={["#05070a", 12, 58]} />
       <ambientLight intensity={0.6} />
       <BayFloor divisions={budget.gridDivisions} />
-      <Hoist detail={tier} />
+      <Lorenz detail={tier} />
       <TelemetryWall maxPanels={budget.wallPanels} />
       {tier === "high" && <ScanSweep />}
     </>

@@ -52,7 +52,7 @@ export const STOP_SPACING = 14;
  * the reading column so it stays framed the whole way down the bay without
  * ever sitting behind the text.
  */
-export const HOIST_OFFSET = new THREE.Vector3(4.4, 0.35, -7.5);
+export const HOIST_OFFSET = new THREE.Vector3(4.6, 0.6, -8.0);
 
 /** Wall panels live to the camera's left, facing back toward the aisle. */
 export const WALL_X = -7.4;

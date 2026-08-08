@@ -1,7 +1,8 @@
 # shashank.dev — The Garage Bay
 
 Personal portfolio. A single fixed WebGL scene — an engineering bay with a
-telemetry wall and a machine on a hoist — sits behind server-rendered HTML.
+telemetry wall and a Lorenz attractor at its centre — sits behind
+server-rendered HTML.
 The camera dollies through the bay as you scroll.
 
 The metaphor is deliberately broad: an F1 pit wall and a Stark workshop are the
@@ -72,6 +73,12 @@ Roles and skills work the same way via [`content/resume.ts`](content/resume.ts).
 - **Scroll never touches React state.** ScrollTrigger writes to a mutable object
   ([`lib/scrollStore.ts`](lib/scrollStore.ts)) that `useFrame` reads, keeping the
   per-frame path free of re-renders.
+- **The centrepiece is a Lorenz attractor**
+  ([`Lorenz.tsx`](components/canvas/Lorenz.tsx)) — integrated with RK4 once at
+  mount, drawn as a faint full trajectory with a bright head tracing the path.
+  It rides the camera curve so it stays framed down the whole bay. Per-frame
+  updates write into the existing position buffer; `setFromPoints` would be
+  rejected every frame, since drei's `<Line>` sizes its buffers once.
 - **The camera path is generated**, not hand-tuned
   ([`lib/constants.ts`](lib/constants.ts)) — which is what makes adding a project
   free.
