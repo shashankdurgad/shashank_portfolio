@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# shashank.dev — The Garage Bay
 
-## Getting Started
+Personal portfolio. A single fixed WebGL scene — an engineering bay with a
+telemetry wall and a machine on a hoist — sits behind server-rendered HTML.
+The camera dollies through the bay as you scroll.
 
-First, run the development server:
+The metaphor is deliberately broad: an F1 pit wall and a Stark workshop are the
+same room, an engineer instrumenting a machine and reading telemetry off it.
+That covers agentic systems, RL, model training and data pipelines equally,
+because all four are the same loop — instrument, measure, tune, repeat.
+
+## Stack
+
+Next 16 (App Router) · React 19 · TypeScript · Tailwind v4 · three / R3F / drei ·
+GSAP ScrollTrigger · Motion · Lenis · Zustand
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Adding a project
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Append one object to [`content/projects.ts`](content/projects.ts). Nothing else
+needs editing — the card, its 3D wall readout, its camera stop and the page's
+scroll length are all derived from this array.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```ts
+{
+  id: "my-project",
+  title: "My Project",
+  subtitle: "what it does",
+  period: "Jan 2027",
+  award: "optional",
+  blurb: "One or two sentences.",
+  bullets: ["Detail.", "Detail."],
+  tags: ["Python", "PyTorch"],
+  links: { repo: "...", paper: "..." },
+  readout: { kind: "waveform", accent: "cyan", density: 0.8 },
+}
+```
 
-## Learn More
+`readout.kind` picks a 3D preset from the registry in
+[`components/canvas/readouts/`](components/canvas/readouts/):
 
-To learn more about Next.js, take a look at the following resources:
+| kind | reads as |
+|---|---|
+| `waveform` | a live signal trace |
+| `lattice` | node graph / swarm |
+| `orbit` | orbital or cyclic system |
+| `flow` | pipeline, funnel, directed flow |
+| `bars` | throughput / histogram |
+| `scatter` | dataset, embedding cloud |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+If a preset isn't enough, pass a component instead — it renders through the same
+path and receives the same `ReadoutProps`:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```ts
+readout: { kind: "custom", component: MyScene }
+```
 
-## Deploy on Vercel
+Roles and skills work the same way via [`content/resume.ts`](content/resume.ts).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Architecture notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **One canvas, mounted once** ([`SceneCanvas.tsx`](components/canvas/SceneCanvas.tsx)),
+  fixed behind the page with `pointer-events: none`. Never remounted per section.
+- **Text is real HTML**, not 3D meshes — so it's selectable, indexable and
+  readable by screen readers. Verify with
+  `curl -s localhost:3000 | grep -i overmind`.
+- **Scroll never touches React state.** ScrollTrigger writes to a mutable object
+  ([`lib/scrollStore.ts`](lib/scrollStore.ts)) that `useFrame` reads, keeping the
+  per-frame path free of re-renders.
+- **The camera path is generated**, not hand-tuned
+  ([`lib/constants.ts`](lib/constants.ts)) — which is what makes adding a project
+  free.
+- **Quality tiers** ([`lib/quality.ts`](lib/quality.ts)): `high` / `low` /
+  `off`. Under `prefers-reduced-motion` or without WebGL the canvas never mounts
+  and a static schematic grid renders instead.
+
+## Verified
+
+Build and typecheck clean; no console errors. Reduced-motion drops the canvas
+with all copy intact; 390px viewport has no horizontal overflow and engages the
+low tier; 120fps scrolling under software GL. Adding a fourth project touches
+exactly one file and lengthens the camera path automatically.
