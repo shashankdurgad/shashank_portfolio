@@ -78,10 +78,19 @@ Roles and skills work the same way via [`content/resume.ts`](content/resume.ts).
 - **Quality tiers** ([`lib/quality.ts`](lib/quality.ts)): `high` / `low` /
   `off`. Under `prefers-reduced-motion` or without WebGL the canvas never mounts
   and a static schematic grid renders instead.
+- **Boot sequence** ([`BootLoader.tsx`](components/ui/BootLoader.tsx)) covers
+  scene load with a schematic self-test, then lifts and hands off to the hero.
+  Progress crosses the R3F boundary via
+  [`ProgressBridge`](components/canvas/ProgressBridge.tsx), since `useProgress`
+  only works inside the Canvas. It is skipped entirely on the `off` tier — there
+  is nothing to wait for — and has both a minimum display time (so a fast load
+  doesn't flash) and a hard timeout (so a stalled one can't trap the page).
 
 ## Verified
 
-Build and typecheck clean; no console errors. Reduced-motion drops the canvas
-with all copy intact; 390px viewport has no horizontal overflow and engages the
-low tier; 120fps scrolling under software GL. Adding a fourth project touches
-exactly one file and lengthens the camera path automatically.
+Build, typecheck and lint clean; no console errors. Reduced-motion drops the
+canvas with all copy intact and never shows the loader; 390px viewport has no
+horizontal overflow and engages the low tier; 120fps scrolling under software
+GL. The boot sequence plays its checks, lifts on its own, and hands off to a
+fully-opaque hero. Adding a fourth project touches exactly one file and
+lengthens the camera path automatically.

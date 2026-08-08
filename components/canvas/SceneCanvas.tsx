@@ -1,12 +1,13 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Preload } from "@react-three/drei";
 import * as THREE from "three";
 import { BUDGET, useQuality } from "@/lib/quality";
 import { BayFloor } from "./BayFloor";
 import { Hoist } from "./Hoist";
+import { ProgressBridge } from "./ProgressBridge";
 import { Rig } from "./Rig";
 import { ScanSweep } from "./ScanSweep";
 import { TelemetryWall } from "./TelemetryWall";
@@ -34,12 +35,8 @@ function Bay({ tier }: { tier: "high" | "low" }) {
 export function SceneCanvas() {
   const tier = useQuality((s) => s.tier);
   const ready = useQuality((s) => s.ready);
-  const init = useQuality((s) => s.init);
 
-  useEffect(() => {
-    init();
-  }, [init]);
-
+  // Tier detection runs in SceneRoot, ahead of this dynamic chunk.
   // "off" covers reduced-motion and missing WebGL: the canvas never mounts.
   if (!ready || tier === "off") return null;
 
@@ -58,6 +55,9 @@ export function SceneCanvas() {
           scene.background = new THREE.Color("#05070a");
         }}
       >
+        {/* Outside Suspense: inside, it would be suspended by the very
+            loading it is meant to report on. */}
+        <ProgressBridge />
         <Suspense fallback={null}>
           <Bay tier={tier} />
           <Preload all />

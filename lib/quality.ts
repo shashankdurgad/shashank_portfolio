@@ -36,14 +36,29 @@ type QualityStore = {
   tier: Tier;
   /** false until detectTier has run on the client */
   ready: boolean;
+  /** 0..100, published from inside the Canvas by drei's useProgress */
+  progress: number;
+  /** true once the scene has loaded and the boot overlay has been dismissed */
+  booted: boolean;
   init: () => void;
+  setProgress: (progress: number) => void;
+  setBooted: () => void;
 };
 
 export const useQuality = create<QualityStore>((set) => ({
   // Start at "off" so SSR and first paint agree; init() upgrades on the client.
   tier: "off",
   ready: false,
-  init: () => set({ tier: detectTier(), ready: true }),
+  progress: 0,
+  booted: false,
+  init: () => {
+    const tier = detectTier();
+    // With no canvas there is nothing to wait for — never gate these users
+    // behind a loader that has no progress to report.
+    set({ tier, ready: true, booted: tier === "off" });
+  },
+  setProgress: (progress) => set({ progress }),
+  setBooted: () => set({ booted: true }),
 }));
 
 /** Per-tier scene budgets, read by scene components. */
