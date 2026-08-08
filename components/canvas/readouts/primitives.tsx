@@ -46,19 +46,35 @@ export function Waveform({ focus, accent, density, seed }: ReadoutProps) {
     [n],
   );
 
+  /**
+   * Write straight into the geometry's position attribute rather than calling
+   * setFromPoints: drei's <Line> uses LineGeometry, whose buffers are sized
+   * once from the initial `points` and cannot grow. setFromPoints is rejected
+   * every frame ("Buffer size too small"), leaving the line frozen.
+   */
   useFrame(({ clock }) => {
+    const geo = lineRef.current?.geometry;
+    if (!geo) return;
+    const attr = geo.getAttribute("position") as THREE.BufferAttribute | undefined;
+    if (!attr) return;
+    const arr = attr.array as Float32Array;
+
     const t = clock.elapsedTime;
     const amp = 0.35 + focus * 0.75;
-    for (let i = 0; i < n; i++) {
+    const count = Math.min(n, arr.length / 3);
+    for (let i = 0; i < count; i++) {
       const x = (i / (n - 1) - 0.5) * W;
       const phase = t * 1.6 - i * 0.16;
       const y =
         Math.sin(phase) * 0.42 * amp +
         Math.sin(phase * 2.3) * 0.16 * amp +
         noise[i] * 0.14 * amp;
-      pts[i].set(x, y, 0);
+      arr[i * 3] = x;
+      arr[i * 3 + 1] = y;
+      arr[i * 3 + 2] = 0;
     }
-    lineRef.current?.geometry.setFromPoints(pts);
+    attr.needsUpdate = true;
+    geo.computeBoundingSphere();
   });
 
   return (
@@ -105,22 +121,44 @@ export function Lattice({ focus, accent, density, seed }: ReadoutProps) {
   const inst = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
+  // Reused across frames: the previous version allocated n fresh Vector3s
+  // every tick, which is steady GC pressure at 60fps.
+  const live = useMemo(
+    () => Array.from({ length: n }, () => new THREE.Vector3()),
+    [n],
+  );
+
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    const live = nodes.map((nd) => {
-      const w = 0.12 + focus * 0.12;
-      return new THREE.Vector3(
+    const w = 0.12 + focus * 0.12;
+    nodes.forEach((nd, i) => {
+      live[i].set(
         nd.base.x + Math.sin(t * 0.5 + nd.drift) * w,
         nd.base.y + Math.cos(t * 0.42 + nd.drift) * w,
         nd.base.z,
       );
     });
 
-    edges.forEach(([a, b], k) => {
-      edgePts[k * 2].copy(live[a]);
-      edgePts[k * 2 + 1].copy(live[b]);
-    });
-    edgeLine.current?.geometry.setFromPoints(edgePts);
+    // Write into the existing buffer — see the note in Waveform above.
+    const geo = edgeLine.current?.geometry;
+    const attr = geo?.getAttribute("position") as THREE.BufferAttribute | undefined;
+    if (geo && attr) {
+      const arr = attr.array as Float32Array;
+      const maxPts = arr.length / 3;
+      for (let k = 0; k < edges.length && k * 2 + 1 < maxPts; k++) {
+        const [a, b] = edges[k];
+        const p0 = live[a];
+        const p1 = live[b];
+        arr[k * 6] = p0.x;
+        arr[k * 6 + 1] = p0.y;
+        arr[k * 6 + 2] = p0.z;
+        arr[k * 6 + 3] = p1.x;
+        arr[k * 6 + 4] = p1.y;
+        arr[k * 6 + 5] = p1.z;
+      }
+      attr.needsUpdate = true;
+      geo.computeBoundingSphere();
+    }
 
     if (inst.current) {
       live.forEach((p, i) => {
