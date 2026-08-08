@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Clean Stark holotable — glowing cyan holograms on dark */
+  --color-void: #05070a;
+  --color-panel: #0a1622;
+  --color-line: #1e3a52;
+  --color-cyan: #7dd3fc;
+  --color-arc: #22d3ee;
+  --color-amber: #fbbf24;
+  --color-ink: #cbd5e1;
+  --color-ink-dim: #64748b;
+
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --font-display: var(--font-michroma), sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-void);
+  color: var(--color-ink);
+  /* Lenis drives scrolling; native smooth would fight it */
+  scroll-behavior: auto;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-mono);
+  overflow-x: clip;
+}
+
+/* Faint schematic grid underlay, sits beneath the canvas */
+.bp-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--color-line) 40%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-line) 40%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Hologram text glow, used sparingly on headings */
+.bp-glow {
+  text-shadow:
+    0 0 12px color-mix(in srgb, var(--color-arc) 45%, transparent),
+    0 0 40px color-mix(in srgb, var(--color-arc) 18%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
