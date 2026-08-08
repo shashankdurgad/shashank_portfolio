@@ -14,7 +14,7 @@ export function Projects() {
             label={p.subtitle}
           >
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-              <h3 className="font-display text-lg uppercase tracking-[0.1em] text-ink">
+              <h3 className="font-display text-lg font-semibold uppercase tracking-[0.06em] text-ink">
                 {p.title}
               </h3>
               <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-dim">

@@ -1,17 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { JetBrains_Mono, Michroma } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { profile } from "@/content/resume";
 
-const jetbrains = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const michroma = Michroma({
-  variable: "--font-michroma",
-  weight: "400",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
 });
@@ -49,7 +42,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${jetbrains.variable} ${michroma.variable} antialiased`}>
+    <html lang="en" className={`${inter.variable} antialiased`}>
       <body className="bg-void text-ink">{children}</body>
     </html>
   );

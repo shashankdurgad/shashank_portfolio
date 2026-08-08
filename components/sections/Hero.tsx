@@ -6,9 +6,9 @@ import { profile } from "@/content/resume";
 import { useQuality } from "@/lib/quality";
 
 const boot = [
-  "BAY.PWR ......... ONLINE",
-  "HOIST.SYNC ...... LOCKED",
-  "TELEMETRY ....... STREAMING",
+  ["BAY.PWR", "ONLINE"],
+  ["HOIST.SYNC", "LOCKED"],
+  ["TELEMETRY", "STREAMING"],
 ];
 
 export function Hero() {
@@ -42,15 +42,22 @@ export function Hero() {
         transition={{ duration: 0.6 }}
         className="mb-8 font-mono text-[11px] leading-relaxed text-ink-dim"
       >
-        {boot.map((line, i) => (
+        {boot.map(([label, status], i) => (
           <motion.div
-            key={line}
+            key={label}
             initial="hidden"
             variants={{ hidden: { opacity: 0, x: -8 }, visible: { opacity: 1, x: 0 } }}
             animate={show}
             transition={{ delay: 0.15 + i * 0.12, duration: 0.4 }}
+            className="flex max-w-76 items-baseline gap-2 tracking-[0.08em]"
           >
-            <span className="text-arc">›</span> {line}
+            <span className="text-arc">›</span>
+            <span>{label}</span>
+            <span
+              aria-hidden="true"
+              className="mx-1 h-px flex-1 self-center border-b border-dotted border-line"
+            />
+            <span className="text-cyan">{status}</span>
           </motion.div>
         ))}
       </motion.div>
@@ -60,7 +67,7 @@ export function Hero() {
         variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
         animate={show}
         transition={{ delay: 0.5, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className="bp-glow font-display text-4xl uppercase leading-[1.05] tracking-[0.06em] text-ink sm:text-6xl lg:text-7xl"
+        className="bp-glow max-w-[11ch] font-display text-5xl font-medium uppercase leading-[1.02] tracking-[0.02em] text-ink sm:text-6xl lg:text-7xl"
       >
         {profile.name}
       </motion.h1>

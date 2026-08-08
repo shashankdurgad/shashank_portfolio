@@ -13,8 +13,6 @@ const CHECKS = [
   { at: 100, label: "BAY.READY", ok: "GO" },
 ];
 
-const dots = (label: string) => ".".repeat(Math.max(2, 16 - label.length));
-
 /**
  * Boot overlay: a schematic self-test that covers scene load, then lifts.
  *
@@ -99,9 +97,16 @@ export function BootLoader() {
                   }`}
                 >
                   <span className={done ? "text-arc" : "text-line"}>›</span>
-                  <span>{c.label}</span>
-                  <span className="text-line">{dots(c.label)}</span>
-                  <span className={done ? "text-cyan" : "text-line"}>
+                  <span className="tracking-[0.08em]">{c.label}</span>
+                  {/* A flexible rule rather than dot characters: leader dots
+                      only align under a monospace face. */}
+                  <span
+                    aria-hidden="true"
+                    className="mx-1 h-px flex-1 self-center border-b border-dotted border-line"
+                  />
+                  <span
+                    className={`tracking-[0.08em] ${done ? "text-cyan" : "text-line"}`}
+                  >
                     {done ? c.ok : "····"}
                   </span>
                 </div>

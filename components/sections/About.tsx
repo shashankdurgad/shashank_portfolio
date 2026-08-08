@@ -28,7 +28,7 @@ export function About() {
         <div className="grid gap-5">
           {education.map((ed, i) => (
             <Panel key={ed.id} fig={`FIG.0${i}`} label="education">
-              <h3 className="font-display text-sm uppercase tracking-[0.1em] text-ink">
+              <h3 className="font-display text-sm font-semibold uppercase tracking-[0.06em] text-ink">
                 {ed.institution}
               </h3>
               <p className="mt-1.5 text-sm text-cyan">{ed.qualification}</p>

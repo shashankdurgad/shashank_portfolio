@@ -71,7 +71,7 @@ export function Section({
           </span>
           <span className="h-px flex-1 bg-line/70" />
         </div>
-        <h2 className="font-display text-2xl uppercase tracking-[0.14em] text-ink sm:text-3xl">
+        <h2 className="font-display text-2xl font-medium uppercase tracking-[0.08em] text-ink sm:text-3xl">
           {title}
         </h2>
       </header>
