@@ -55,8 +55,24 @@ export function ScrollController() {
         },
       });
 
+      // Separate trigger for the morph region: its 0..1 maps to the four
+      // stages, independent of overall page progress.
+      const morphEl = document.querySelector("#morph");
+      const morphTrigger = morphEl
+        ? ScrollTrigger.create({
+            trigger: morphEl,
+            start: "top top",
+            end: "bottom bottom",
+            scrub: true,
+            onUpdate: (self) => {
+              scroll.morph = self.progress * 3;
+            },
+          })
+        : null;
+
       return () => {
         document.removeEventListener("click", onClick);
+        morphTrigger?.kill();
         trigger.kill();
         gsap.ticker.remove(raf);
         lenis.destroy();

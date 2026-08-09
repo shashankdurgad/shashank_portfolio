@@ -10,6 +10,11 @@ export const scroll = {
   progress: 0,
   /** index of the section currently nearest the camera */
   section: 0,
+  /**
+   * 0..3 across the morph region: attractor → molecules → sphere → tree.
+   * Driven by its own ScrollTrigger, independent of page progress.
+   */
+  morph: 0,
 };
 
 export type ScrollState = typeof scroll;

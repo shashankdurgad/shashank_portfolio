@@ -138,6 +138,12 @@ export function Lorenz({ detail }: { detail: "high" | "low" }) {
       group.current.rotation.y = s.angle;
       group.current.rotation.z = -0.18 + Math.sin(t * 0.25) * 0.06;
 
+      // Hand off to the morph field: the attractor recedes as the sequence
+      // begins, so the two are never both competing for attention.
+      const handoff = 1 - THREE.MathUtils.smoothstep(scroll.morph, 0.0, 0.6);
+      group.current.visible = handoff > 0.02;
+      group.current.scale.setScalar(0.95 * (0.4 + handoff * 0.6));
+
       if (process.env.NODE_ENV !== "production") {
         // Test hook: lets a browser check assert the friction curve directly,
         // since pixel churn saturates on the constantly-animating head.

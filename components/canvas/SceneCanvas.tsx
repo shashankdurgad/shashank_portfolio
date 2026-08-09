@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { BUDGET, useQuality } from "@/lib/quality";
 import { BayFloor } from "./BayFloor";
 import { Lorenz } from "./Lorenz";
+import { MorphField } from "./MorphField";
 import { ProgressBridge } from "./ProgressBridge";
 import { Rig } from "./Rig";
 import { ScanSweep } from "./ScanSweep";
@@ -20,6 +21,17 @@ function Bay({ tier }: { tier: "high" | "low" }) {
       <ambientLight intensity={0.6} />
       <BayFloor divisions={budget.gridDivisions} />
       <Lorenz detail={tier} />
+      <MorphField
+        detail={tier}
+        onSelect={(side) => {
+          // Scroll to the existing sections. What clicking should ultimately
+          // do is deliberately undecided — this is the placeholder target.
+          const id = side === "left" ? "#experience" : "#projects";
+          document.querySelector<HTMLElement>(id)?.scrollIntoView({
+            behavior: "smooth",
+          });
+        }}
+      />
       <TelemetryWall maxPanels={budget.wallPanels} />
       {tier === "high" && <ScanSweep />}
     </>
