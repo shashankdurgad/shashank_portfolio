@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
 import { CAMERA_CURVE, HOIST_OFFSET } from "@/lib/constants";
@@ -63,10 +63,43 @@ function integrate(steps: number, dt: number) {
  * traces the path through it, so the system reads as running rather than
  * displayed.
  */
+/** Idle spin rate, rad/s, that drag hands back to when it settles. */
+const IDLE_SPIN = 0.1;
+/** Fraction of angular velocity retained per second — the friction curve. */
+const DAMPING = 0.12;
+/** Screen px of horizontal drag → rad/s of angular velocity. */
+const DRAG_GAIN = 0.011;
+
 export function Lorenz({ detail }: { detail: "high" | "low" }) {
   const group = useRef<THREE.Group>(null);
   const headRef = useRef<React.ComponentRef<typeof Line>>(null);
   const glowRef = useRef<THREE.Mesh>(null);
+
+  /**
+   * Spin state, kept in refs so dragging never triggers a React render.
+   * One degree of freedom (yaw), so the "physics" is just angular velocity
+   * under exponential friction — a rigid-body engine would add a WASM
+   * dependency and a second update loop to solve a problem we don't have.
+   */
+  const spin = useRef({
+    angle: 0,
+    velocity: IDLE_SPIN,
+    dragging: false,
+    lastX: 0,
+    /** Velocity sampled from recent pointer motion, for release momentum. */
+    throwVel: 0,
+  });
+  const [hovered, setHovered] = useState(false);
+
+  // Cursor affordance — without it the attractor gives no sign it's grabbable.
+  useEffect(() => {
+    if (!hovered) return;
+    const prev = document.body.style.cursor;
+    document.body.style.cursor = "grab";
+    return () => {
+      document.body.style.cursor = prev;
+    };
+  }, [hovered]);
 
   const steps = detail === "high" ? 4200 : 1600;
   const dt = detail === "high" ? 0.0045 : 0.009;
@@ -92,10 +125,28 @@ export function Lorenz({ detail }: { detail: "high" | "low" }) {
       tmp.y += Math.sin(t * 0.6) * 0.08;
       group.current.position.lerp(tmp, Math.min(1, delta * 2.6));
 
-      // Tilt so the butterfly reads face-on rather than edge-on, and rotate
-      // slowly to give the structure depth.
-      group.current.rotation.y += delta * (0.1 + p * 0.18);
+      // Angular integration. While dragging the pointer drives the angle
+      // directly; on release the stored throw velocity carries it and decays
+      // toward the idle spin, so it coasts to rest rather than stopping dead.
+      const s = spin.current;
+      if (!s.dragging) {
+        const target = IDLE_SPIN + p * 0.18;
+        const k = Math.pow(DAMPING, delta);
+        s.velocity = target + (s.velocity - target) * k;
+        s.angle += s.velocity * delta;
+      }
+      group.current.rotation.y = s.angle;
       group.current.rotation.z = -0.18 + Math.sin(t * 0.25) * 0.06;
+
+      if (process.env.NODE_ENV !== "production") {
+        // Test hook: lets a browser check assert the friction curve directly,
+        // since pixel churn saturates on the constantly-animating head.
+        (window as unknown as { __lorenz?: unknown }).__lorenz = {
+          angle: s.angle,
+          velocity: s.velocity,
+          dragging: s.dragging,
+        };
+      }
     }
 
     // Advance the traced head along the trajectory.
@@ -122,15 +173,62 @@ export function Lorenz({ detail }: { detail: "high" | "low" }) {
     }
   });
 
+  const onDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    (e.target as Element)?.setPointerCapture?.(e.pointerId);
+    const s = spin.current;
+    s.dragging = true;
+    s.lastX = e.clientX;
+    s.throwVel = 0;
+  };
+
+  const onMove = (e: ThreeEvent<PointerEvent>) => {
+    const s = spin.current;
+    if (!s.dragging) return;
+    e.stopPropagation();
+    const dx = e.clientX - s.lastX;
+    s.lastX = e.clientX;
+    s.angle += dx * DRAG_GAIN;
+    // Blend so a brief stutter mid-drag doesn't kill the throw.
+    s.throwVel = s.throwVel * 0.7 + dx * DRAG_GAIN * 60 * 0.3;
+  };
+
+  const endDrag = (e: ThreeEvent<PointerEvent>) => {
+    const s = spin.current;
+    if (!s.dragging) return;
+    (e.target as Element)?.releasePointerCapture?.(e.pointerId);
+    s.dragging = false;
+    // Hand the sampled pointer speed to the physics as launch velocity.
+    s.velocity = THREE.MathUtils.clamp(s.throwVel, -14, 14);
+  };
+
   return (
     <group ref={group} scale={0.95}>
+      {/*
+        Invisible grab target. The wireframe lines are ~1px and effectively
+        impossible to hit; this sphere gives the drag a real surface while
+        staying invisible. pointer-events are enabled here only — the canvas
+        itself stays pointer-events:none so the HTML above remains clickable.
+      */}
+      <mesh
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        <sphereGeometry args={[1.55, 16, 16]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
       {/* Full trajectory, faint — the structure */}
       <Line
         points={path}
         color="#7dd3fc"
-        lineWidth={1}
+        lineWidth={hovered ? 1.4 : 1}
         transparent
-        opacity={0.32}
+        opacity={hovered ? 0.55 : 0.32}
       />
 
       {/* Traced head, bright — the motion */}

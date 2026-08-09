@@ -43,13 +43,24 @@ export function SceneCanvas() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-0"
+      className="fixed inset-0 z-0"
       data-scene-tier={tier}
     >
       <Canvas
         dpr={BUDGET[tier].dpr}
         gl={{ antialias: tier === "high", powerPreference: "high-performance" }}
         camera={{ fov: 52, near: 0.1, far: 90, position: [0, 1.75, 4] }}
+        /*
+         * The canvas element ignores pointer events, so page content above it
+         * stays clickable; R3F still hit-tests, and interactive meshes opt back
+         * in by setting pointerEvents:"auto" on the container in onPointerOver.
+         * Without this the whole viewport would swallow clicks on links.
+         */
+        style={{ pointerEvents: "none" }}
+        eventSource={
+          typeof document !== "undefined" ? document.body : undefined
+        }
+        eventPrefix="client"
         onCreated={({ gl, scene }) => {
           gl.setClearColor(new THREE.Color("#05070a"), 1);
           scene.background = new THREE.Color("#05070a");
