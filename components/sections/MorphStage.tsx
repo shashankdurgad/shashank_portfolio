@@ -14,15 +14,15 @@ export function MorphStage() {
       id="morph"
       aria-label="Interactive sequence"
       className="relative"
-      style={{ height: "400vh" }}
+      style={{ height: "320vh" }}
     >
       {/* Stage captions, pinned as the sequence advances behind them. */}
       <div className="pointer-events-none sticky top-0 flex h-screen items-end justify-center pb-16">
         <p className="max-w-md text-center text-[11px] uppercase tracking-[0.22em] text-ink-dim/70">
           <span className="sr-only">
-            An animated sequence: a Lorenz attractor disperses into molecules, gathers
-            into a sphere, then forms a branching tree. The left branches lead to
-            experience and education, the right to projects.
+            An animated sequence: a portrait bust rendered as particles bursts apart,
+            then the fragments gather into a branching tree. The left branches lead
+            to experience and education, the right to projects.
           </span>
           <span aria-hidden="true">scroll</span>
         </p>

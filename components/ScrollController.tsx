@@ -65,7 +65,7 @@ export function ScrollController() {
             end: "bottom bottom",
             scrub: true,
             onUpdate: (self) => {
-              scroll.morph = self.progress * 3;
+              scroll.morph = self.progress * 2;
             },
           })
         : null;

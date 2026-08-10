@@ -3,10 +3,12 @@ import * as THREE from "three";
 /**
  * Position buffers for every stage of the morph sequence.
  *
- * The hard rule: every generator returns a Float32Array of exactly N*3. The
- * vertex shader lerps index-to-index between stages, so mismatched lengths
- * would tear the morph apart. Stages with fewer natural points repeat and
- * jitter to fill; stages with more are subsampled.
+ * Sequence: face → explosion → tree. The face comes from sampling a mesh at
+ * runtime (see lib/faceSampler.ts); the tree is generated here.
+ *
+ * The hard rule: every buffer is exactly N*3. The vertex shader lerps
+ * index-to-index between stages, so mismatched lengths would tear the morph
+ * apart.
  */
 
 /** Deterministic PRNG so the scene is identical across reloads. */
@@ -19,135 +21,7 @@ export function rng(seed: number) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Stage 0 — Lorenz attractor                                          */
-
-const SIGMA = 10;
-const RHO = 28;
-const BETA = 8 / 3;
-
-/**
- * Integrate the Lorenz system with RK4.
- * Shared with the hero attractor so both describe the same object.
- */
-export function lorenzPath(steps: number, dt: number): THREE.Vector3[] {
-  const pts: THREE.Vector3[] = [];
-  let x = 0.01;
-  let y = 0;
-  let z = 0;
-
-  const d = (px: number, py: number, pz: number) => [
-    SIGMA * (py - px),
-    px * (RHO - pz) - py,
-    px * py - BETA * pz,
-  ];
-
-  // Discard the transient so the curve starts on the attractor itself.
-  for (let i = 0; i < 400; i++) {
-    const [dx, dy, dz] = d(x, y, z);
-    x += dx * dt;
-    y += dy * dt;
-    z += dz * dt;
-  }
-
-  for (let i = 0; i < steps; i++) {
-    const [k1x, k1y, k1z] = d(x, y, z);
-    const [k2x, k2y, k2z] = d(x + (k1x * dt) / 2, y + (k1y * dt) / 2, z + (k1z * dt) / 2);
-    const [k3x, k3y, k3z] = d(x + (k2x * dt) / 2, y + (k2y * dt) / 2, z + (k2z * dt) / 2);
-    const [k4x, k4y, k4z] = d(x + k3x * dt, y + k3y * dt, z + k3z * dt);
-
-    x += ((k1x + 2 * k2x + 2 * k3x + k4x) * dt) / 6;
-    y += ((k1y + 2 * k2y + 2 * k3y + k4y) * dt) / 6;
-    z += ((k1z + 2 * k2z + 2 * k3z + k4z) * dt) / 6;
-
-    pts.push(new THREE.Vector3(x * 0.055, (z - 25) * 0.055, y * 0.055));
-  }
-  return pts;
-}
-
-/** Resample the attractor curve to exactly n points. */
-export function attractorPositions(n: number, seed = 7): Float32Array {
-  const path = lorenzPath(Math.max(n, 2000), 0.006);
-  const out = new Float32Array(n * 3);
-  const r = rng(seed);
-  for (let i = 0; i < n; i++) {
-    const p = path[Math.floor((i / n) * path.length)];
-    // Slight scatter so the curve reads as a cloud rather than a hard wire.
-    out[i * 3] = p.x + (r() - 0.5) * 0.02;
-    out[i * 3 + 1] = p.y + (r() - 0.5) * 0.02;
-    out[i * 3 + 2] = p.z + (r() - 0.5) * 0.02;
-  }
-  return out;
-}
-
-/* ------------------------------------------------------------------ */
-/* Stage 1 — molecules                                                 */
-
-/**
- * Clusters of atoms: each is a nucleus with electrons on a tilted ring.
- * Particles are dealt round-robin across clusters so the disintegration
- * from the attractor scatters evenly rather than peeling off in blocks.
- */
-export function moleculePositions(n: number, seed = 21): Float32Array {
-  const out = new Float32Array(n * 3);
-  const r = rng(seed);
-  const clusters = 26;
-
-  const centres = Array.from({ length: clusters }, () => ({
-    c: new THREE.Vector3((r() - 0.5) * 3.4, (r() - 0.5) * 2.2, (r() - 0.5) * 2.4),
-    radius: 0.18 + r() * 0.22,
-    tilt: r() * Math.PI,
-    yaw: r() * Math.PI * 2,
-  }));
-
-  for (let i = 0; i < n; i++) {
-    const m = centres[i % clusters];
-    const local = i / clusters;
-
-    if (local % 7 < 1) {
-      // Nucleus: tight blob at the centre.
-      out[i * 3] = m.c.x + (r() - 0.5) * 0.05;
-      out[i * 3 + 1] = m.c.y + (r() - 0.5) * 0.05;
-      out[i * 3 + 2] = m.c.z + (r() - 0.5) * 0.05;
-    } else {
-      // Electron shell: point on a tilted ring.
-      const a = r() * Math.PI * 2;
-      const rx = Math.cos(a) * m.radius;
-      const ry = Math.sin(a) * m.radius;
-      const ct = Math.cos(m.tilt);
-      const st = Math.sin(m.tilt);
-      const cy = Math.cos(m.yaw);
-      const sy = Math.sin(m.yaw);
-      out[i * 3] = m.c.x + rx * cy - ry * st * sy;
-      out[i * 3 + 1] = m.c.y + ry * ct;
-      out[i * 3 + 2] = m.c.z + rx * sy + ry * st * cy;
-    }
-  }
-  return out;
-}
-
-/* ------------------------------------------------------------------ */
-/* Stage 2 — sphere                                                    */
-
-/**
- * Fibonacci sphere: even distribution with no clumping at the poles,
- * which naive lat/long sampling produces.
- */
-export function spherePositions(n: number, radius = 1.35): Float32Array {
-  const out = new Float32Array(n * 3);
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < n; i++) {
-    const y = 1 - (i / (n - 1)) * 2;
-    const r = Math.sqrt(Math.max(0, 1 - y * y));
-    const theta = golden * i;
-    out[i * 3] = Math.cos(theta) * r * radius;
-    out[i * 3 + 1] = y * radius;
-    out[i * 3 + 2] = Math.sin(theta) * r * radius;
-  }
-  return out;
-}
-
-/* ------------------------------------------------------------------ */
-/* Stage 3 — recursive fractal tree                                    */
+/* Stage 2 — recursive fractal tree (final)                                    */
 
 type Branch = {
   start: THREE.Vector3;
@@ -241,26 +115,23 @@ export function treePositions(
 /* ------------------------------------------------------------------ */
 
 /** Particle count per quality tier. Same N across every stage. */
-export const PARTICLES = { high: 12000, low: 4000 } as const;
+export const PARTICLES = { high: 40000, low: 12000 } as const;
 
-export type MorphBuffers = {
-  attractor: Float32Array;
-  molecule: Float32Array;
-  sphere: Float32Array;
-  tree: Float32Array;
-  sides: Float32Array;
-  count: number;
-};
-
-/** Build every stage at once, guaranteeing identical lengths. */
-export function buildMorphBuffers(count: number): MorphBuffers {
-  const { positions: tree, sides } = treePositions(count);
-  return {
-    attractor: attractorPositions(count),
-    molecule: moleculePositions(count),
-    sphere: spherePositions(count),
-    tree,
-    sides,
-    count,
-  };
+/**
+ * Per-particle random unit direction, used to scatter the explosion so the
+ * burst is chaotic rather than a clean radial puff.
+ */
+export function scatterDirections(n: number, seed = 91): Float32Array {
+  const out = new Float32Array(n * 3);
+  const r = rng(seed);
+  for (let i = 0; i < n; i++) {
+    // Uniform on the sphere: inverting cos avoids clustering at the poles.
+    const u = r() * 2 - 1;
+    const theta = r() * Math.PI * 2;
+    const s = Math.sqrt(Math.max(0, 1 - u * u));
+    out[i * 3] = s * Math.cos(theta);
+    out[i * 3 + 1] = u;
+    out[i * 3 + 2] = s * Math.sin(theta);
+  }
+  return out;
 }
