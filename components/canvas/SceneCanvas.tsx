@@ -8,14 +8,16 @@ import { BUDGET, useQuality } from "@/lib/quality";
 import { BayFloor } from "./BayFloor";
 import { MorphField } from "./MorphField";
 import { ProgressBridge } from "./ProgressBridge";
+import { Starfield } from "./Starfield";
 import { Rig } from "./Rig";
 
 function Bay({ tier }: { tier: "high" | "low" }) {
   const budget = BUDGET[tier];
   return (
     <>
-      <fog attach="fog" args={["#05070a", 12, 58]} />
+      <fog attach="fog" args={["#05070a", 14, 120]} />
       <ambientLight intensity={0.6} />
+      <Starfield count={budget.stars} />
       <BayFloor divisions={budget.gridDivisions} />
       <MorphField
         detail={tier}
@@ -53,7 +55,7 @@ export function SceneCanvas() {
       <Canvas
         dpr={BUDGET[tier].dpr}
         gl={{ antialias: tier === "high", powerPreference: "high-performance" }}
-        camera={{ fov: 52, near: 0.1, far: 90, position: [0, 1.75, 4] }}
+        camera={{ fov: 52, near: 0.1, far: 160, position: [0, 1.75, 4] }}
         /*
          * The canvas element ignores pointer events, so page content above it
          * stays clickable; R3F still hit-tests, and interactive meshes opt back

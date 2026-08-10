@@ -63,7 +63,7 @@ export const useQuality = create<QualityStore>((set) => ({
 
 /** Per-tier scene budgets, read by scene components. */
 export const BUDGET = {
-  high: { dpr: [1, 2] as [number, number], gridDivisions: 60, wallPanels: 9, points: 900 },
-  low: { dpr: [1, 1] as [number, number], gridDivisions: 28, wallPanels: 5, points: 260 },
-  off: { dpr: [1, 1] as [number, number], gridDivisions: 0, wallPanels: 0, points: 0 },
+  high: { dpr: [1, 2] as [number, number], gridDivisions: 60, wallPanels: 9, stars: 1400 },
+  low: { dpr: [1, 1] as [number, number], gridDivisions: 28, wallPanels: 5, stars: 500 },
+  off: { dpr: [1, 1] as [number, number], gridDivisions: 0, wallPanels: 0, stars: 0 },
 } as const;
