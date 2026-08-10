@@ -1,36 +1,49 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { firstMesh, sampleMesh } from "@/lib/faceSampler";
+import { ProceduralEyeSource } from "@/lib/eyeGeometry";
+import { eyePositions } from "@/lib/eyeTargets";
+import { createBlink, createGaze, stepBlink, stepGaze } from "@/lib/gaze";
 import { PARTICLES, rng, scatterDirections, treePositions } from "@/lib/morphTargets";
 import { scroll } from "@/lib/scrollStore";
-import { beginDrag, createSpin, endDrag, moveDrag, stepSpin } from "@/lib/spin";
 import { morphFragment, morphVertex } from "./morph.glsl";
-
-const MODEL_URL = "/models/head.glb";
 
 /**
  * Fixed world position. The field used to ride the camera, which made the
- * head drift across the viewport as you scrolled; it is now static in 3D
- * space and only its rotation changes.
+ * subject drift across the viewport as you scrolled; it is now static in 3D
+ * space and does not rotate at all.
  */
 const FIELD_POSITION = new THREE.Vector3(0, 1.5, 0);
 
-/** Fraction of the model's height discarded — the bust's flat plinth. */
-const PLINTH_CROP = 0.3;
+/**
+ * Morph range over which the lids close, ahead of the blast.
+ *
+ * The window has to be wide enough to actually be sampled. uProgress chases
+ * scroll.morph with an exponential ease, and the hero's ScrollTrigger jumps
+ * morph from 0 to ~0.45 in one step when its pinned region releases — so a
+ * close packed into the first few hundredths would be skipped over entirely
+ * and the shut eye would never be seen. Closing across 0..0.4 keeps the lids
+ * on screen for the whole approach, and the blast waits for them (see
+ * BLAST_START in morph.glsl).
+ */
+const CLOSE_FROM = 0.0;
+const CLOSE_TO = 0.4;
 
-/** Scroll progress below which the face is still coherent enough to grab. */
-const GRAB_UNTIL = 0.25;
+/**
+ * Virtual distance to the cursor plane used when solving gaze angles. See the
+ * note at the solve — this trades literal accuracy for a gaze that stays
+ * expressive across the whole viewport instead of clamping at the edges.
+ */
+const GAZE_DEPTH = 9;
 
 const cursorPlane = new THREE.Plane();
 const hitPoint = new THREE.Vector3();
 const localCursor = new THREE.Vector3();
 const camDir = new THREE.Vector3();
 const planeNormal = new THREE.Vector3();
-const yAxis = new THREE.Vector3(0, 1, 0);
+const pointer = new THREE.Vector2();
 
 function makeUniforms(detail: "high" | "low") {
   return {
@@ -45,16 +58,29 @@ function makeUniforms(detail: "high" | "low") {
     uForm: { value: 1 },
     uColor: { value: new THREE.Color("#57a8cf") },
     uAccent: { value: new THREE.Color("#2bb8d4") },
+    /*
+     * The low tier packs a third of the particles into the same volume with
+     * larger points, so additive blending saturates the pupil far sooner.
+     * A lower gain there keeps it bright without blowing out to flat white.
+     */
+    uPupilGain: { value: detail === "high" ? 1.15 : 0.8 },
     uOpacity: { value: 0 },
+    uGazeL: { value: new THREE.Vector2(0, 0) },
+    uGazeR: { value: new THREE.Vector2(0, 0) },
+    uBlink: { value: 0 },
   };
 }
 
 /**
- * face → explosion → tree.
+ * eyes → explosion → tree.
  *
  * One particle system whose targets change; particles never spawn or die, so
  * the sequence reads as the same matter rearranging. The explosion is
  * procedural (see the vertex shader) rather than a third target buffer.
+ *
+ * The eyes track the cursor with saccadic physics (lib/gaze.ts) and blink on
+ * their own. Drag-to-spin is deliberately absent: an eye that can be spun
+ * horizontally stops reading as an eye.
  */
 export function MorphField({
   detail,
@@ -66,28 +92,38 @@ export function MorphField({
   const group = useRef<THREE.Group>(null);
   const matRef = useRef<THREE.ShaderMaterial>(null);
   const [hoverSide, setHoverSide] = useState(0);
-  const [grabbable, setGrabbable] = useState(true);
+
+  /** One gaze state per eye, seeded apart so they never move in lockstep. */
+  const gazeL = useRef(createGaze(0));
+  const gazeR = useRef(createGaze(1));
+  const blink = useRef(createBlink());
+
   /**
-   * The bust already faces the camera at rotation 0. Idle spin is 0 — a
-   * portrait should hold still and be turned deliberately, unlike the
-   * attractor which span on its own.
+   * Pointer in normalised device coordinates, tracked from the window rather
+   * than read off R3F's `state.pointer`.
+   *
+   * The Canvas sits at pointer-events:none with the page content above it, so
+   * R3F's own pointer never updates — the events land on the HTML overlay, not
+   * the canvas, and R3F discards them. The eyes must follow the cursor
+   * everywhere on the page, including over the text, so a plain window
+   * listener is both simpler and more correct than routing through hit-testing.
    */
-  const spin = useRef(createSpin(0, 0));
+  const ndc = useRef({ x: 0, y: 0, seen: false });
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      ndc.current.x = (e.clientX / window.innerWidth) * 2 - 1;
+      ndc.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      ndc.current.seen = true;
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, []);
 
   const count = detail === "high" ? PARTICLES.high : PARTICLES.low;
-  const { scene } = useGLTF(MODEL_URL);
 
-  const face = useMemo(() => {
-    const mesh = firstMesh(scene);
-    if (!mesh) {
-      // Degrade to an empty cloud rather than taking down the whole scene.
-      return {
-        positions: new Float32Array(count * 3),
-        normals: new Float32Array(count * 3),
-      };
-    }
-    return sampleMesh(mesh, count, 2.4, PLINTH_CROP);
-  }, [scene, count]);
+  // Sized by width, not height — see eyePositions. 2.9 puts the pair in the
+  // horizontal slot the bust occupied between the two text columns.
+  const eyes = useMemo(() => eyePositions(new ProceduralEyeSource(), count, 2.9), [count]);
 
   const tree = useMemo(() => treePositions(count), [count]);
   const scatter = useMemo(() => scatterDirections(count), [count]);
@@ -101,15 +137,19 @@ export function MorphField({
   const initialUniforms = useMemo(() => makeUniforms(detail), [detail]);
 
   /**
-   * The head is sized to sit between two flanking text columns. On a narrow
-   * viewport the copy stacks on top of it instead, so it has to shrink or it
-   * swallows the headline.
+   * Sized to sit between two flanking text columns. On a narrow viewport the
+   * copy stacks on top instead, so it has to shrink or it swallows the
+   * headline.
+   *
+   * The mid tier is tighter than the bust's was: two eyes span wider than one
+   * head at the same height, and at 1024px the pair was reaching into the
+   * columns.
    */
   const [fieldScale, setFieldScale] = useState(1.15);
   useEffect(() => {
     const fit = () => {
       const w = window.innerWidth;
-      setFieldScale(w < 640 ? 0.62 : w < 1024 ? 0.85 : 1.15);
+      setFieldScale(w < 640 ? 0.62 : w < 1024 ? 0.78 : 1.15);
     };
     fit();
     window.addEventListener("resize", fit);
@@ -122,23 +162,23 @@ export function MorphField({
   }, [hoverSide]);
 
   /**
-   * Cursor affordance: pointer over a tree, grab over the intact face.
+   * Cursor affordance: pointer over a tree. There is no longer a grab state —
+   * the eyes are not draggable, so advertising a grab would be a lie.
    *
    * Setting `body.style.cursor` would shadow the crosshair defined in
    * globals.css, so a data attribute drives it from CSS instead — the
-   * crosshair stays the baseline and these are variants of it.
+   * crosshair stays the baseline and this is a variant of it.
    */
   useEffect(() => {
-    const mode = hoverSide ? "target" : grabbable ? "grab" : "";
-    if (!mode) {
+    if (!hoverSide) {
       delete document.body.dataset.cursor;
       return;
     }
-    document.body.dataset.cursor = mode;
+    document.body.dataset.cursor = "target";
     return () => {
       delete document.body.dataset.cursor;
     };
-  }, [hoverSide, grabbable]);
+  }, [hoverSide]);
 
   useFrame((state, delta) => {
     /*
@@ -157,47 +197,72 @@ export function MorphField({
 
     const p = u.uProgress.value;
     u.uTreeMix.value = THREE.MathUtils.smoothstep(p, 1.6, 1.95);
-    // Depth-fading only applies while the face is a coherent surface.
-    u.uForm.value = 1 - THREE.MathUtils.smoothstep(p, 0.05, 0.55);
+    // Depth-fading only applies while the eyes are a coherent surface. Held
+    // until the lids have shut, so the closed pose keeps its silhouette.
+    u.uForm.value = 1 - THREE.MathUtils.smoothstep(p, 0.42, 0.75);
 
     // Visible from the hero onward; fades out as the page content takes over.
     const vis = 1 - THREE.MathUtils.smoothstep(p, 2.05, 2.4);
     u.uOpacity.value += (vis - u.uOpacity.value) * Math.min(1, delta * 4);
 
     if (group.current) {
-      // Drag only while the face is still coherent; once it bursts there is
-      // nothing to grab, and a live drag would fight the scroll.
-      const canGrab = p < GRAB_UNTIL;
-      if (canGrab !== grabbable) setGrabbable(canGrab);
-      if (!canGrab && spin.current.dragging) endDrag(spin.current);
-
-      /*
-       * The whole group carries the spin, so without this the trees would
-       * inherit whatever angle the head was left at — turn the bust sideways
-       * and the trees end up edge-on. Unwind to zero as the explosion
-       * progresses so the trees always face front, whatever you did to the
-       * head. The spin state keeps ticking so scrolling back restores it.
-       */
-      const spun = stepSpin(spin.current, delta, 0);
-      const unwind = THREE.MathUtils.smoothstep(p, 0.15, 1.0);
-      group.current.rotation.y = spun * (1 - unwind);
-
-      // Cursor plane faces the camera through the field's centre.
+      // Cursor plane faces the camera through the field's centre. The group
+      // never rotates now, so the hit point needs no un-rotation to reach
+      // local space — only the offset from the field's origin.
       state.camera.getWorldDirection(camDir);
       planeNormal.copy(camDir).negate();
       cursorPlane.setFromNormalAndCoplanarPoint(planeNormal, group.current.position);
-      state.raycaster.setFromCamera(state.pointer, state.camera);
-      if (state.raycaster.ray.intersectPlane(cursorPlane, hitPoint)) {
-        localCursor.copy(hitPoint).sub(group.current.position);
-        // Undo the group's actual rotation (post-unwind, not the raw spin
-        // angle) so repulsion tracks the cursor in local space.
-        localCursor.applyAxisAngle(yAxis, -group.current.rotation.y);
+
+      pointer.set(ndc.current.x, ndc.current.y);
+      state.raycaster.setFromCamera(pointer, state.camera);
+
+      /*
+       * Gaze only runs once the pointer has actually moved. Before that the
+       * eyes hold their rest pose rather than snapping to screen centre —
+       * which is where an untouched pointer would otherwise aim them.
+       */
+      if (ndc.current.seen && state.raycaster.ray.intersectPlane(cursorPlane, hitPoint)) {
+        localCursor.copy(hitPoint).sub(group.current.position).divideScalar(fieldScale);
         u.uCursor.value.lerp(localCursor, Math.min(1, delta * 9));
+
+        /*
+         * Aim each eye at the cursor from its own socket, so both eyes
+         * converge on the same point and toe in slightly when it is close.
+         * Solving per-eye rather than sharing one angle is what makes the
+         * convergence read at all.
+         */
+        for (const [g, side] of [
+          [gazeL.current, -1],
+          [gazeR.current, 1],
+        ] as const) {
+          const dx = localCursor.x - side * eyes.separation;
+          const dy = localCursor.y;
+          /*
+           * +Z is toward the camera, so the eye looks along +Z at rest.
+           *
+           * GAZE_DEPTH is deliberately larger than the camera's actual 4-unit
+           * distance. Solving against the true distance demands angles far past
+           * the anatomical limit for any cursor off centre, so the eyes clamp
+           * and stop differentiating across most of the screen. Pushing the
+           * virtual target back compresses the whole viewport into the usable
+           * cone, so motion stays legible corner to corner.
+           */
+          const dz = Math.max(0.5, localCursor.z + GAZE_DEPTH);
+          stepGaze(g, Math.atan2(dx, dz), -Math.atan2(dy, dz), delta, state.clock.elapsedTime);
+        }
       }
+
+      // Lids close as the blast begins, on top of the idle blink timer.
+      const close = THREE.MathUtils.smoothstep(p, CLOSE_FROM, CLOSE_TO);
+      u.uBlink.value = stepBlink(blink.current, delta, close);
+
+      u.uGazeL.value.set(gazeL.current.yaw, gazeL.current.pitch);
+      u.uGazeR.value.set(gazeR.current.yaw, gazeR.current.pitch);
     }
     if (process.env.NODE_ENV !== "production" && group.current) {
-      // Test hook: lets a browser assert the field is genuinely static,
-      // which pixel-diffing cannot show while particles animate every frame.
+      // Test hook: lets a browser assert the field is genuinely static and
+      // that the gaze is live, neither of which pixel-diffing can show while
+      // particles animate every frame.
       (window as unknown as { __field?: unknown }).__field = {
         x: +group.current.position.x.toFixed(4),
         y: +group.current.position.y.toFixed(4),
@@ -205,24 +270,32 @@ export function MorphField({
         rotY: +group.current.rotation.y.toFixed(4),
         camX: +state.camera.position.x.toFixed(3),
         camZ: +state.camera.position.z.toFixed(3),
+        gazeL: [+gazeL.current.yaw.toFixed(4), +gazeL.current.pitch.toFixed(4)],
+        gazeR: [+gazeR.current.yaw.toFixed(4), +gazeR.current.pitch.toFixed(4)],
+        blink: +blink.current.value.toFixed(4),
+        cursor: [+localCursor.x.toFixed(3), +localCursor.y.toFixed(3)],
+        morph: +p.toFixed(4),
       };
     }
     /* eslint-enable react-hooks/immutability */
   });
 
-  const progress = () => matRef.current?.uniforms.uProgress.value ?? 0;
   const treeInteractive = () => (matRef.current?.uniforms.uTreeMix.value ?? 0) > 0.5;
 
   return (
     <group ref={group} position={FIELD_POSITION} scale={fieldScale}>
       <points frustumCulled={false}>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[face.positions, 3]} />
-          <bufferAttribute attach="attributes-aNormal" args={[face.normals, 3]} />
+          <bufferAttribute attach="attributes-position" args={[eyes.positions, 3]} />
+          <bufferAttribute attach="attributes-aNormal" args={[eyes.normals, 3]} />
           <bufferAttribute attach="attributes-aScatter" args={[scatter, 3]} />
           <bufferAttribute attach="attributes-aTree" args={[tree.positions, 3]} />
           <bufferAttribute attach="attributes-aSide" args={[tree.sides, 1]} />
           <bufferAttribute attach="attributes-aSeed" args={[seeds, 1]} />
+          <bufferAttribute attach="attributes-aEye" args={[eyes.eye, 1]} />
+          <bufferAttribute attach="attributes-aPart" args={[eyes.part, 1]} />
+          <bufferAttribute attach="attributes-aLid" args={[eyes.lid, 1]} />
+          <bufferAttribute attach="attributes-aSocket" args={[eyes.socket, 3]} />
         </bufferGeometry>
         <shaderMaterial
           ref={matRef}
@@ -234,30 +307,6 @@ export function MorphField({
           blending={THREE.AdditiveBlending}
         />
       </points>
-
-      {/* Grab target for spinning the face — particles can't be hit-tested. */}
-      <mesh
-        visible={false}
-        onPointerDown={(e: ThreeEvent<PointerEvent>) => {
-          if (progress() > GRAB_UNTIL) return;
-          e.stopPropagation();
-          (e.target as Element)?.setPointerCapture?.(e.pointerId);
-          beginDrag(spin.current, e.clientX);
-        }}
-        onPointerMove={(e: ThreeEvent<PointerEvent>) => {
-          if (!spin.current.dragging) return;
-          e.stopPropagation();
-          moveDrag(spin.current, e.clientX);
-        }}
-        onPointerUp={(e: ThreeEvent<PointerEvent>) => {
-          (e.target as Element)?.releasePointerCapture?.(e.pointerId);
-          endDrag(spin.current);
-        }}
-        onPointerCancel={() => endDrag(spin.current)}
-      >
-        <sphereGeometry args={[1.5, 16, 16]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
 
       {/*
         One hit target per tree, placed over each canopy's measured centroid
@@ -288,5 +337,3 @@ export function MorphField({
     </group>
   );
 }
-
-useGLTF.preload(MODEL_URL);
