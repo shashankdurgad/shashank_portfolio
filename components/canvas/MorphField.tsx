@@ -37,8 +37,8 @@ function makeUniforms(detail: "high" | "low") {
     uProgress: { value: 0 },
     uSize: { value: detail === "high" ? 2.2 : 3.0 },
     uCursor: { value: new THREE.Vector3(999, 999, 999) },
-    uCursorRadius: { value: 0.9 },
-    uPush: { value: 0.55 },
+    uCursorRadius: { value: 0.38 },
+    uPush: { value: 0.3 },
     uHoverSide: { value: 0 },
     uTreeMix: { value: 0 },
     uTime: { value: 0 },
@@ -121,13 +121,22 @@ export function MorphField({
     if (u) u.uHoverSide.value = hoverSide;
   }, [hoverSide]);
 
-  // Cursor affordance: pointer over a tree half, grab over the intact face.
+  /**
+   * Cursor affordance: pointer over a tree, grab over the intact face.
+   *
+   * Setting `body.style.cursor` would shadow the crosshair defined in
+   * globals.css, so a data attribute drives it from CSS instead — the
+   * crosshair stays the baseline and these are variants of it.
+   */
   useEffect(() => {
-    if (!hoverSide && !grabbable) return;
-    const prev = document.body.style.cursor;
-    document.body.style.cursor = hoverSide ? "pointer" : "grab";
+    const mode = hoverSide ? "target" : grabbable ? "grab" : "";
+    if (!mode) {
+      delete document.body.dataset.cursor;
+      return;
+    }
+    document.body.dataset.cursor = mode;
     return () => {
-      document.body.style.cursor = prev;
+      delete document.body.dataset.cursor;
     };
   }, [hoverSide, grabbable]);
 
