@@ -100,6 +100,22 @@ export function MorphField({
 
   const initialUniforms = useMemo(() => makeUniforms(detail), [detail]);
 
+  /**
+   * The head is sized to sit between two flanking text columns. On a narrow
+   * viewport the copy stacks on top of it instead, so it has to shrink or it
+   * swallows the headline.
+   */
+  const [fieldScale, setFieldScale] = useState(1.15);
+  useEffect(() => {
+    const fit = () => {
+      const w = window.innerWidth;
+      setFieldScale(w < 640 ? 0.62 : w < 1024 ? 0.85 : 1.15);
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
   useEffect(() => {
     const u = matRef.current?.uniforms;
     if (u) u.uHoverSide.value = hoverSide;
@@ -178,7 +194,7 @@ export function MorphField({
   const treeInteractive = () => (matRef.current?.uniforms.uTreeMix.value ?? 0) > 0.5;
 
   return (
-    <group ref={group} position={FIELD_POSITION} scale={1.15}>
+    <group ref={group} position={FIELD_POSITION} scale={fieldScale}>
       <points frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[face.positions, 3]} />
