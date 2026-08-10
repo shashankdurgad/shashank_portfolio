@@ -9,8 +9,6 @@ import { BayFloor } from "./BayFloor";
 import { MorphField } from "./MorphField";
 import { ProgressBridge } from "./ProgressBridge";
 import { Rig } from "./Rig";
-import { ScanSweep } from "./ScanSweep";
-import { TelemetryWall } from "./TelemetryWall";
 
 function Bay({ tier }: { tier: "high" | "low" }) {
   const budget = BUDGET[tier];
@@ -22,16 +20,12 @@ function Bay({ tier }: { tier: "high" | "low" }) {
       <MorphField
         detail={tier}
         onSelect={(side) => {
-          // Scroll to the existing sections. What clicking should ultimately
-          // do is deliberately undecided — this is the placeholder target.
-          const id = side === "left" ? "#experience" : "#projects";
-          document.querySelector<HTMLElement>(id)?.scrollIntoView({
-            behavior: "smooth",
-          });
+          // Console only. What clicking should ultimately do is deliberately
+          // undecided; the sections it used to scroll to have been removed.
+          const label = side === "left" ? "work & education" : "projects";
+          console.log(`[tree] clicked: ${side} → ${label}`);
         }}
       />
-      <TelemetryWall maxPanels={budget.wallPanels} />
-      {tier === "high" && <ScanSweep />}
     </>
   );
 }

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { profile } from "@/content/resume";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -9,10 +8,23 @@ const inter = Inter({
   display: "swap",
 });
 
+/**
+ * Site identity, inlined. Previously imported from content/resume.ts; that
+ * module was removed with the resume sections, and metadata must not depend
+ * on content modules that come and go with the UX.
+ */
+const SITE = {
+  name: "Shashank Durgad",
+  tagline: "agentic AI systems and the infra that make them measurably better",
+  blurb:
+    "CS at UCL, SWE intern at Overmind. I build agentic systems and the measurement layer around them — traces, evals, and the pipelines that turn both into better models.",
+  github: "https://github.com/shashankdurgad",
+};
+
 export const metadata: Metadata = {
-  title: `${profile.name} — ${profile.tagline}`,
-  description: profile.blurb,
-  authors: [{ name: profile.name, url: profile.links.github }],
+  title: `${SITE.name} — ${SITE.tagline}`,
+  description: SITE.blurb,
+  authors: [{ name: SITE.name, url: SITE.github }],
   keywords: [
     "Shashank Durgad",
     "agentic AI",
@@ -23,15 +35,15 @@ export const metadata: Metadata = {
     "software engineer",
   ],
   openGraph: {
-    title: `${profile.name} — ${profile.tagline}`,
-    description: profile.blurb,
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.blurb,
     type: "profile",
     locale: "en_GB",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${profile.name} — ${profile.tagline}`,
-    description: profile.blurb,
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.blurb,
   },
 };
 

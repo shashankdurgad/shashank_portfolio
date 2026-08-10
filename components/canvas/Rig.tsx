@@ -1,46 +1,30 @@
 "use client";
 
-import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { CAMERA_CURVE, LOOK_AHEAD } from "@/lib/constants";
-import { scroll } from "@/lib/scrollStore";
+import { CAMERA_POSITION, CAMERA_TARGET } from "@/lib/constants";
 
 const tmpPos = new THREE.Vector3();
-const tmpLook = new THREE.Vector3();
 
 /**
- * Drives the camera along the generated bay path.
+ * Static camera with a touch of cursor parallax.
  *
- * Reads `scroll.progress` (a plain mutable object written by ScrollTrigger)
- * rather than React state, so this runs every frame with zero re-renders.
+ * The camera previously dollied along a generated path. It no longer moves:
+ * the particle field is fixed in world space and the sequence plays out in
+ * front of the camera, so nothing drifts as you scroll.
  */
 export function Rig({ pointer = true }: { pointer?: boolean }) {
-  const look = useRef(new THREE.Vector3(0, 1.6, -10));
-
   useFrame((state, dt) => {
-    const p = THREE.MathUtils.clamp(scroll.progress, 0, 1);
-    const k = Math.min(1, dt * 3.2);
+    tmpPos.copy(CAMERA_POSITION);
 
-    // Position along the curve.
-    CAMERA_CURVE.getPointAt(p, tmpPos);
-
-    // Subtle parallax from the cursor — the "hand on the holotable" feel.
+    // Subtle parallax from the cursor — the only camera motion that remains.
     if (pointer) {
-      tmpPos.x += state.pointer.x * 0.5;
-      tmpPos.y += state.pointer.y * 0.28;
+      tmpPos.x += state.pointer.x * 0.35;
+      tmpPos.y += state.pointer.y * 0.2;
     }
-    state.camera.position.lerp(tmpPos, k);
 
-    // Look further down the aisle. Keeping the target ahead on the same curve
-    // means the camera reads as travelling through the bay rather than
-    // orbiting a fixed point.
-    CAMERA_CURVE.getPointAt(Math.min(1, p + LOOK_AHEAD), tmpLook);
-    tmpLook.z -= 14;
-    tmpLook.y = 1.5;
-
-    look.current.lerp(tmpLook, k);
-    state.camera.lookAt(look.current);
+    state.camera.position.lerp(tmpPos, Math.min(1, dt * 3));
+    state.camera.lookAt(CAMERA_TARGET);
   });
 
   return null;

@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
-import { STOPS } from "@/lib/constants";
 import { scroll } from "@/lib/scrollStore";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -51,7 +50,6 @@ export function ScrollController() {
         scrub: true,
         onUpdate: (self) => {
           scroll.progress = self.progress;
-          scroll.section = Math.round(self.progress * (STOPS.length - 1));
         },
       });
 
@@ -82,7 +80,6 @@ export function ScrollController() {
     const onScroll = () => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       scroll.progress = max > 0 ? window.scrollY / max : 0;
-      scroll.section = Math.round(scroll.progress * (STOPS.length - 1));
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });

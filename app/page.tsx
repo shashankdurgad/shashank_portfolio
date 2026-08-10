@@ -1,12 +1,6 @@
 import { SceneRoot } from "@/components/canvas/SceneRoot";
-import { About } from "@/components/sections/About";
-import { Contact } from "@/components/sections/Contact";
-import { Experience } from "@/components/sections/Experience";
 import { Hero } from "@/components/sections/Hero";
 import { MorphStage } from "@/components/sections/MorphStage";
-import { Projects } from "@/components/sections/Projects";
-import { Skills } from "@/components/sections/Skills";
-import { Nav } from "@/components/ui/Nav";
 
 export default function Home() {
   return (
@@ -25,17 +19,11 @@ export default function Home() {
       />
 
       <SceneRoot />
-      <Nav />
 
       {/* All copy lives here: real HTML, server-rendered, selectable. */}
       <main id="main" className="relative z-10">
         <Hero />
         <MorphStage />
-        <About />
-        <Experience />
-        <Projects />
-        <Skills />
-        <Contact />
       </main>
     </>
   );

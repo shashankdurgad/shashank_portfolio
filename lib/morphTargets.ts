@@ -23,6 +23,9 @@ export function rng(seed: number) {
 /* ------------------------------------------------------------------ */
 /* Stage 2 — recursive fractal tree (final)                                    */
 
+/** Angle between the two trunks, in degrees. */
+export const TREE_SPREAD_DEG = 65;
+
 type Branch = {
   start: THREE.Vector3;
   end: THREE.Vector3;
@@ -55,7 +58,7 @@ function growBranches(maxDepth: number, seed: number): Branch[] {
     for (let i = 0; i < children; i++) {
       // Spread children apart in the XY plane, with a little Z wander so the
       // tree has depth instead of being flat.
-      const spread = 0.26 + r() * 0.16;
+      const spread = 0.20 + r() * 0.12;
       const lean = i === 0 ? -spread : spread;
       const next = dir
         .clone()
@@ -63,20 +66,30 @@ function growBranches(maxDepth: number, seed: number): Branch[] {
         .applyAxisAngle(new THREE.Vector3(1, 0, 0), (r() - 0.5) * 0.7)
         .normalize();
 
-      // Depth 0 is the trunk; its two children define left and right. The
-      // trunk itself keeps side 0 so it never highlights with either half.
-      const childSide = depth === 0 ? (i === 0 ? -1 : 1) : side;
-      grow(end, next, len * (0.76 + r() * 0.06), depth + 1, childSide);
+      // Every particle inherits the side of the tree it belongs to, set once
+      // at the root — the two trees are the two buttons.
+      grow(end, next, len * (0.76 + r() * 0.06), depth + 1, side);
     }
   };
 
-  grow(new THREE.Vector3(0, -1.15, 0), new THREE.Vector3(0, 1, 0), 0.62, 0, 0);
+  /**
+   * Two trees from a shared base, splayed apart. Previously this was one tree
+   * tagged left/right at its first split, but the two halves were visually
+   * indistinguishable — separate trunks make each one read as its own target.
+   */
+  const base = new THREE.Vector3(0, -1.15, 0);
+  const half = (TREE_SPREAD_DEG * Math.PI) / 180 / 2;
+  const lean = (a: number) =>
+    new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), a).normalize();
+
+  grow(base.clone(), lean(half), 0.62, 0, -1); // leans left
+  grow(base.clone(), lean(-half), 0.62, 0, 1); // leans right
   return branches;
 }
 
 /**
  * Sample points along the branches. Returns positions plus a per-particle
- * side attribute (-1 / +1) used for the two interactive halves.
+ * side attribute (-1 left tree / +1 right tree) used for the two hit targets.
  */
 export function treePositions(
   n: number,

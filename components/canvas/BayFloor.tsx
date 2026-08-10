@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { Line } from "@react-three/drei";
 import * as THREE from "three";
-import { STOPS, STOP_SPACING } from "@/lib/constants";
 
 /**
  * Wireframe bay floor. One merged LineSegments for the whole grid so the
@@ -13,7 +12,9 @@ export function BayFloor({ divisions }: { divisions: number }) {
   const points = useMemo(() => {
     if (divisions <= 0) return [];
 
-    const depth = (STOPS.length + 1) * STOP_SPACING;
+    // Fixed extent: the camera no longer travels, so the floor just needs
+    // to reach the horizon from a static viewpoint.
+    const depth = 60;
     const halfW = 16;
     const pts: THREE.Vector3[] = [];
 
@@ -21,14 +22,14 @@ export function BayFloor({ divisions }: { divisions: number }) {
     const lanes = Math.max(4, Math.round(divisions / 3));
     for (let i = 0; i <= lanes; i++) {
       const x = -halfW + (i / lanes) * halfW * 2;
-      pts.push(new THREE.Vector3(x, 0, STOP_SPACING));
+      pts.push(new THREE.Vector3(x, 0, 14));
       pts.push(new THREE.Vector3(x, 0, -depth));
     }
 
     // Cross ties.
     const ties = divisions;
     for (let i = 0; i <= ties; i++) {
-      const z = STOP_SPACING - (i / ties) * (depth + STOP_SPACING);
+      const z = 14 - (i / ties) * (depth + 14);
       pts.push(new THREE.Vector3(-halfW, 0, z));
       pts.push(new THREE.Vector3(halfW, 0, z));
     }

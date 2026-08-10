@@ -2,8 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { profile } from "@/content/resume";
 import { useQuality } from "@/lib/quality";
+
+/**
+ * Hero copy, inlined. Previously imported from content/resume.ts, which was
+ * removed with the resume sections.
+ */
+const PROFILE = {
+  name: "Shashank Durgad",
+  tagline: "agentic AI systems and the infra that make them measurably better",
+  blurb:
+    "CS at UCL, SWE intern at Overmind. I build agentic systems and the measurement layer around them — traces, evals, and the pipelines that turn both into better models.",
+  location: "London, UK",
+  email: "shashankdurgad@gmail.com",
+  links: {
+    github: "https://github.com/shashankdurgad",
+    linkedin: "https://linkedin.com/in/shashank-durgad",
+  },
+};
 
 const boot = [
   ["BAY.PWR", "ONLINE"],
@@ -69,7 +85,7 @@ export function Hero() {
         transition={{ delay: 0.5, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         className="bp-glow max-w-[11ch] font-display text-5xl font-medium uppercase leading-[1.02] tracking-[0.02em] text-ink sm:text-6xl lg:text-7xl"
       >
-        {profile.name}
+        {PROFILE.name}
       </motion.h1>
 
       <motion.p
@@ -79,7 +95,7 @@ export function Hero() {
         transition={{ delay: 0.68, duration: 0.6 }}
         className="mt-5 max-w-xl text-balance font-mono text-sm leading-relaxed text-cyan sm:text-base"
       >
-        {profile.tagline}
+        {PROFILE.tagline}
       </motion.p>
 
       <motion.p
@@ -89,7 +105,7 @@ export function Hero() {
         transition={{ delay: 0.8, duration: 0.6 }}
         className="mt-4 max-w-xl text-sm leading-relaxed text-ink-dim"
       >
-        {profile.blurb}
+        {PROFILE.blurb}
       </motion.p>
 
       <motion.div
@@ -101,13 +117,13 @@ export function Hero() {
       >
         <a
           className="border-b border-arc/40 pb-0.5 text-arc transition-colors hover:border-arc hover:text-ink"
-          href={`mailto:${profile.email}`}
+          href={`mailto:${PROFILE.email}`}
         >
           Email
         </a>
         <a
           className="border-b border-line pb-0.5 text-ink-dim transition-colors hover:border-cyan hover:text-cyan"
-          href={profile.links.github}
+          href={PROFILE.links.github}
           target="_blank"
           rel="noreferrer"
         >
@@ -115,13 +131,13 @@ export function Hero() {
         </a>
         <a
           className="border-b border-line pb-0.5 text-ink-dim transition-colors hover:border-cyan hover:text-cyan"
-          href={profile.links.linkedin}
+          href={PROFILE.links.linkedin}
           target="_blank"
           rel="noreferrer"
         >
           LinkedIn
         </a>
-        <span className="text-ink-dim/70">{profile.location}</span>
+        <span className="text-ink-dim/70">{PROFILE.location}</span>
       </motion.div>
     </section>
   );

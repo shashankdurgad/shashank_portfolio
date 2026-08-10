@@ -13,10 +13,11 @@ import { morphFragment, morphVertex } from "./morph.glsl";
 const MODEL_URL = "/models/head.glb";
 
 /**
- * Offset from the camera along its path. The field rides the camera so it
- * stays framed at a constant apparent size throughout the sequence.
+ * Fixed world position. The field used to ride the camera, which made the
+ * head drift across the viewport as you scrolled; it is now static in 3D
+ * space and only its rotation changes.
  */
-const FIELD_OFFSET = new THREE.Vector3(0, -0.1, -6.4);
+const FIELD_POSITION = new THREE.Vector3(0, 1.5, 0);
 
 /** Fraction of the model's height discarded — the bust's flat plinth. */
 const PLINTH_CROP = 0.3;
@@ -27,7 +28,6 @@ const GRAB_UNTIL = 0.25;
 const cursorPlane = new THREE.Plane();
 const hitPoint = new THREE.Vector3();
 const localCursor = new THREE.Vector3();
-const fieldTarget = new THREE.Vector3();
 const camDir = new THREE.Vector3();
 const planeNormal = new THREE.Vector3();
 const yAxis = new THREE.Vector3(0, 1, 0);
@@ -140,12 +140,6 @@ export function MorphField({
     u.uOpacity.value += (vis - u.uOpacity.value) * Math.min(1, delta * 4);
 
     if (group.current) {
-      state.camera.getWorldDirection(camDir);
-      fieldTarget.copy(state.camera.position).addScaledVector(camDir, -FIELD_OFFSET.z);
-      fieldTarget.x += FIELD_OFFSET.x;
-      fieldTarget.y += FIELD_OFFSET.y;
-      group.current.position.lerp(fieldTarget, Math.min(1, delta * 3));
-
       // Drag only while the face is still coherent; once it bursts there is
       // nothing to grab, and a live drag would fight the scroll.
       const canGrab = p < GRAB_UNTIL;
@@ -153,8 +147,8 @@ export function MorphField({
       if (!canGrab && spin.current.dragging) endDrag(spin.current);
       group.current.rotation.y = stepSpin(spin.current, delta, 0);
 
-      // Cursor plane faces the camera through the field's centre. Negate into
-      // a scratch vector — mutating camDir would corrupt next frame's position.
+      // Cursor plane faces the camera through the field's centre.
+      state.camera.getWorldDirection(camDir);
       planeNormal.copy(camDir).negate();
       cursorPlane.setFromNormalAndCoplanarPoint(planeNormal, group.current.position);
       state.raycaster.setFromCamera(state.pointer, state.camera);
@@ -165,6 +159,18 @@ export function MorphField({
         u.uCursor.value.lerp(localCursor, Math.min(1, delta * 9));
       }
     }
+    if (process.env.NODE_ENV !== "production" && group.current) {
+      // Test hook: lets a browser assert the field is genuinely static,
+      // which pixel-diffing cannot show while particles animate every frame.
+      (window as unknown as { __field?: unknown }).__field = {
+        x: +group.current.position.x.toFixed(4),
+        y: +group.current.position.y.toFixed(4),
+        z: +group.current.position.z.toFixed(4),
+        rotY: +group.current.rotation.y.toFixed(4),
+        camX: +state.camera.position.x.toFixed(3),
+        camZ: +state.camera.position.z.toFixed(3),
+      };
+    }
     /* eslint-enable react-hooks/immutability */
   });
 
@@ -172,7 +178,7 @@ export function MorphField({
   const treeInteractive = () => (matRef.current?.uniforms.uTreeMix.value ?? 0) > 0.5;
 
   return (
-    <group ref={group} scale={1.15}>
+    <group ref={group} position={FIELD_POSITION} scale={1.15}>
       <points frustumCulled={false}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[face.positions, 3]} />
@@ -217,11 +223,15 @@ export function MorphField({
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {/* Hit targets for the two tree halves. */}
+      {/*
+        One hit target per tree, placed over each canopy's measured centroid
+        (±1.24, 0.65). Particles are ~2px and cannot be picked reliably, so
+        invisible planes stand in.
+      */}
       {(["left", "right"] as const).map((side, i) => (
         <mesh
           key={side}
-          position={[i === 0 ? -0.95 : 0.95, 0.1, 0]}
+          position={[i === 0 ? -1.24 : 1.24, 0.65, 0]}
           visible={false}
           onPointerOver={(e) => {
             if (!treeInteractive()) return;
@@ -235,7 +245,7 @@ export function MorphField({
             onSelect(side);
           }}
         >
-          <planeGeometry args={[1.9, 3.2]} />
+          <planeGeometry args={[1.8, 2.4]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       ))}
