@@ -43,8 +43,8 @@ function makeUniforms(detail: "high" | "low") {
     uTreeMix: { value: 0 },
     uTime: { value: 0 },
     uForm: { value: 1 },
-    uColor: { value: new THREE.Color("#7dd3fc") },
-    uAccent: { value: new THREE.Color("#22d3ee") },
+    uColor: { value: new THREE.Color("#57a8cf") },
+    uAccent: { value: new THREE.Color("#2bb8d4") },
     uOpacity: { value: 0 },
   };
 }
@@ -170,7 +170,17 @@ export function MorphField({
       const canGrab = p < GRAB_UNTIL;
       if (canGrab !== grabbable) setGrabbable(canGrab);
       if (!canGrab && spin.current.dragging) endDrag(spin.current);
-      group.current.rotation.y = stepSpin(spin.current, delta, 0);
+
+      /*
+       * The whole group carries the spin, so without this the trees would
+       * inherit whatever angle the head was left at — turn the bust sideways
+       * and the trees end up edge-on. Unwind to zero as the explosion
+       * progresses so the trees always face front, whatever you did to the
+       * head. The spin state keeps ticking so scrolling back restores it.
+       */
+      const spun = stepSpin(spin.current, delta, 0);
+      const unwind = THREE.MathUtils.smoothstep(p, 0.15, 1.0);
+      group.current.rotation.y = spun * (1 - unwind);
 
       // Cursor plane faces the camera through the field's centre.
       state.camera.getWorldDirection(camDir);
@@ -179,7 +189,8 @@ export function MorphField({
       state.raycaster.setFromCamera(state.pointer, state.camera);
       if (state.raycaster.ray.intersectPlane(cursorPlane, hitPoint)) {
         localCursor.copy(hitPoint).sub(group.current.position);
-        // Undo the field's spin so repulsion follows the cursor in local space.
+        // Undo the group's actual rotation (post-unwind, not the raw spin
+        // angle) so repulsion tracks the cursor in local space.
         localCursor.applyAxisAngle(yAxis, -group.current.rotation.y);
         u.uCursor.value.lerp(localCursor, Math.min(1, delta * 9));
       }

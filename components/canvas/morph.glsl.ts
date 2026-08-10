@@ -104,6 +104,6 @@ export const morphFragment = /* glsl */ `
 
     // Additive blending stacks alpha; keep it low so density reads as
     // structure instead of saturating to white.
-    gl_FragColor = vec4(col, alpha * uOpacity * fog * vFacing * 0.6);
+    gl_FragColor = vec4(col, alpha * uOpacity * fog * vFacing * 0.46);
   }
 `;
