@@ -6,7 +6,9 @@ import * as THREE from "three";
 import { ProceduralEyeSource } from "@/lib/eyeGeometry";
 import { eyePositions } from "@/lib/eyeTargets";
 import { createBlink, createGaze, stepBlink, stepGaze } from "@/lib/gaze";
-import { PARTICLES, rng, scatterDirections, treePositions } from "@/lib/morphTargets";
+import { haloPositions } from "@/lib/haloTargets";
+import { Doors } from "./Doors";
+import { PARTICLES, rng, scatterDirections } from "@/lib/morphTargets";
 import { scroll } from "@/lib/scrollStore";
 import { morphFragment, morphVertex } from "./morph.glsl";
 
@@ -80,7 +82,7 @@ function makeUniforms(detail: "high" | "low") {
 }
 
 /**
- * eyes → explosion → tree.
+ * eyes → explosion → doors.
  *
  * One particle system whose targets change; particles never spawn or die, so
  * the sequence reads as the same matter rearranging. The explosion is
@@ -133,7 +135,16 @@ export function MorphField({
   // horizontal slot the bust occupied between the two text columns.
   const eyes = useMemo(() => eyePositions(new ProceduralEyeSource(), count, 2.9), [count]);
 
-  const tree = useMemo(() => treePositions(count), [count]);
+  /*
+   * The final stage is the doors, which are real geometry rather than
+   * particles. The cloud becomes the atmosphere around them: a loose halo
+   * framing the doorway instead of trying to be a shape itself.
+   */
+  const halo = useMemo(() => haloPositions(count), [count]);
+
+  /** 0 until the doors are on screen; gates their interactivity. */
+  const doorsVisible = useRef(0);
+
   const scatter = useMemo(() => scatterDirections(count), [count]);
   const seeds = useMemo(() => {
     const r = rng(5);
@@ -164,13 +175,8 @@ export function MorphField({
     return () => window.removeEventListener("resize", fit);
   }, []);
 
-  useEffect(() => {
-    const u = matRef.current?.uniforms;
-    if (u) u.uHoverSide.value = hoverSide;
-  }, [hoverSide]);
-
   /**
-   * Cursor affordance: pointer over a tree. There is no longer a grab state —
+   * Cursor affordance: pointer over a door. There is no longer a grab state —
    * the eyes are not draggable, so advertising a grab would be a lie.
    *
    * Setting `body.style.cursor` would shadow the crosshair defined in
@@ -195,7 +201,6 @@ export function MorphField({
      * The immutability rule cannot tell "reassigning a ref" from "mutating
      * the object a ref points at", so it is disabled for this block only.
      */
-    /* eslint-disable react-hooks/immutability */
     const u = matRef.current?.uniforms;
     if (!u) return;
     u.uTime.value = state.clock.elapsedTime;
@@ -209,13 +214,27 @@ export function MorphField({
     // until the lids have shut, so the closed pose keeps its silhouette.
     u.uForm.value = 1 - THREE.MathUtils.smoothstep(p, 0.42, 0.75);
 
-    // Visible from the hero onward; fades out as the page content takes over.
-    const vis = 1 - THREE.MathUtils.smoothstep(p, 2.05, 2.4);
+    /*
+     * Visible from the hero onward, then dimmed as the doors take over.
+     *
+     * The fade used to begin at 2.05, but uProgress is clamped to 2 — so it
+     * never ran, and the cloud stayed at full strength behind the doors as a
+     * pair of bright blobs. It now settles to a faint atmosphere instead of
+     * competing with the thing it is meant to frame.
+     */
+    const vis = 1 - THREE.MathUtils.smoothstep(p, 1.6, 1.95) * 0.55;
     u.uOpacity.value += (vis - u.uOpacity.value) * Math.min(1, delta * 4);
 
     /*
+     * Fade the doors in as the final stage arrives. They are geometry, so
+     * their own materials handle the fade — this only gates interactivity and
+     * tells them how far along the stage is.
+     */
+    doorsVisible.current = THREE.MathUtils.smoothstep(p, 1.6, 1.95);
+
+    /*
      * Ease the hover grow rather than snapping it, which would pop. Faster in
-     * than out so the tree answers the pointer promptly but settles back
+     * than out so the halo answers the pointer promptly but settles back
      * unhurriedly — the reverse reads as sluggish then twitchy.
      *
      * Driven off the uniform rather than the React state: it already carries
@@ -296,14 +315,12 @@ export function MorphField({
         blink: +blink.current.value.toFixed(4),
         cursor: [+localCursor.x.toFixed(3), +localCursor.y.toFixed(3)],
         morph: +p.toFixed(4),
+        doors: +doorsVisible.current.toFixed(4),
         hoverSide: u.uHoverSide.value,
         hoverGrow: +u.uHoverGrow.value.toFixed(4),
       };
     }
-    /* eslint-enable react-hooks/immutability */
   });
-
-  const treeInteractive = () => (matRef.current?.uniforms.uTreeMix.value ?? 0) > 0.5;
 
   return (
     <group ref={group} position={FIELD_POSITION} scale={fieldScale}>
@@ -312,8 +329,8 @@ export function MorphField({
           <bufferAttribute attach="attributes-position" args={[eyes.positions, 3]} />
           <bufferAttribute attach="attributes-aNormal" args={[eyes.normals, 3]} />
           <bufferAttribute attach="attributes-aScatter" args={[scatter, 3]} />
-          <bufferAttribute attach="attributes-aTree" args={[tree.positions, 3]} />
-          <bufferAttribute attach="attributes-aSide" args={[tree.sides, 1]} />
+          <bufferAttribute attach="attributes-aTree" args={[halo.positions, 3]} />
+          <bufferAttribute attach="attributes-aSide" args={[halo.sides, 1]} />
           <bufferAttribute attach="attributes-aSeed" args={[seeds, 1]} />
           <bufferAttribute attach="attributes-aEye" args={[eyes.eye, 1]} />
           <bufferAttribute attach="attributes-aPart" args={[eyes.part, 1]} />
@@ -331,40 +348,8 @@ export function MorphField({
         />
       </points>
 
-      {/*
-        One hit target per tree, placed over each canopy's measured centroid
-        (±1.24, 0.65). Particles are ~2px and cannot be picked reliably, so
-        invisible planes stand in.
-      */}
-      {(["left", "right"] as const).map((side, i) => (
-        <mesh
-          key={side}
-          position={[i === 0 ? -1.24 : 1.24, 0.65, 0]}
-          visible={false}
-          onPointerOver={(e) => {
-            if (!treeInteractive()) return;
-            e.stopPropagation();
-            setHoverSide(i === 0 ? -1 : 1);
-          }}
-          onPointerOut={() => setHoverSide(0)}
-          onClick={(e) => {
-            if (!treeInteractive()) return;
-            e.stopPropagation();
-            onSelect(side);
-          }}
-        >
-          {/*
-            Sized to bound the grown tree, not the resting one. A plane that
-            only covered the resting canopy would leave the grown fringe
-            hoverable but not hit-testable, and near the edge that oscillates:
-            pointer enters, tree grows past the plane, pointer is outside,
-            tree shrinks back under the pointer, and the hover flickers. The
-            planes are invisible, so the extra margin costs nothing.
-          */}
-          <planeGeometry args={[2.1, 2.8]} />
-          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-        </mesh>
-      ))}
+      <Doors visible={doorsVisible} onSelect={onSelect} onHover={setHoverSide} />
+
     </group>
   );
 }

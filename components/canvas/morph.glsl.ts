@@ -1,5 +1,10 @@
 /**
- * Morph shaders: eyes → explosion → tree.
+ * Morph shaders: eyes → explosion → doors.
+ *
+ * The aTree attribute and uTreeMix uniform keep their names from when the
+ * final stage was a pair of fractal trees. They mean "final stage target" and
+ * "final stage has formed"; renaming them would touch several files to no
+ * behavioural end.
  *
  * Stage positions live as vertex attributes and are blended on the GPU via
  * uProgress. Nothing rewrites the position buffer per frame, so cost stays
@@ -17,23 +22,26 @@ export const morphVertex = /* glsl */ `
   uniform float uCursorRadius;
   uniform float uPush;
   uniform float uHoverSide;     // -1 left, +1 right, 0 none
-  uniform float uTreeMix;       // 1 once the tree has formed
+  uniform float uTreeMix;       // 1 once the final stage has formed
   uniform float uTime;
   uniform float uForm;       // 1 while the eyes are intact, 0 once dispersed
   uniform vec2  uGazeL;      // left eye yaw/pitch, radians
   uniform vec2  uGazeR;      // right eye yaw/pitch, radians
   uniform float uBlink;      // 0 open, 1 shut
-  uniform float uHoverGrow;  // 0..1, eased on the CPU; scales the hovered tree
+  uniform float uHoverGrow;  // 0..1, eased on the CPU; scales the hovered side
 
   /*
-   * Where both trunks meet the ground — see growBranches in morphTargets.
-   * The hover grow scales about this point so the trees stay rooted.
+   * Where the doors meet the ground — see DOOR_CENTRE in lib/doors.
+   *
+   * The halo's hover drift pivots here. The doors themselves are meshes and
+   * animate on their own; this only nudges the surrounding cloud so the
+   * atmosphere acknowledges the hover too.
    */
-  const vec3 TREE_BASE = vec3(0.0, -1.15, 0.0);
+  const vec3 HALO_ANCHOR = vec3(0.0, 0.35, 0.0);
 
   attribute vec3  aNormal;      // surface normal
   attribute vec3  aScatter;     // per-particle random unit direction
-  attribute vec3  aTree;
+  attribute vec3  aTree;        // final-stage target: the doorway halo
   attribute float aSide;
   attribute float aSeed;
   attribute float aEye;         // -1 left eye, +1 right
@@ -110,25 +118,27 @@ export const morphVertex = /* glsl */ `
       + nrm      * blast * 0.85
       + aScatter * blast * 0.55;
 
-    // Second half: the dispersed cloud contracts into the tree.
+    /*
+     * Second half: the dispersed cloud gathers into the halo.
+     *
+     * aTree is the halo framing the doorway. The doors themselves are
+     * geometry, so the cloud no longer has to be the shape — it only has to
+     * surround it.
+     */
     float t2 = smoothstep(0.0, 1.0, clamp(p - 1.0, 0.0, 1.0));
     vec3 pos = mix(blown, aTree, t2);
 
+
     /*
-     * Hover grow. The hovered tree swells to signal that it is clickable.
-     *
-     * Scaled about the shared trunk base, not each tree's own centroid. Both
-     * trunks start at the same point on the ground, so scaling about a
-     * centroid would lift them off it and open a gap at the join. Growing
-     * from the base keeps them rooted and splays the canopy outward, which
-     * reads as the tree growing rather than merely inflating.
-     *
-     * Gated on uTreeMix because this same code runs at every morph stage —
-     * without it the eyes and the explosion would scale on hover too.
+     * The halo drifts slightly with the hovered side, so the atmosphere
+     * acknowledges the hover even though the door itself does the real work.
      */
     float mine = step(0.5, aSide * uHoverSide);
-    float hoverScale = 1.0 + mine * uHoverGrow * uTreeMix * 0.15;
-    pos = TREE_BASE + (pos - TREE_BASE) * hoverScale;
+    float lift = mine * uHoverGrow * uTreeMix;
+    vec3 fromRoot = pos - HALO_ANCHOR;
+    fromRoot.x *= 1.0 + lift * 0.16;
+    fromRoot.y += lift * 0.3 * abs(fromRoot.x) / 1.6;
+    pos = HALO_ANCHOR + fromRoot;
 
     // Turbulence, strongest mid-explosion where the cloud is loosest.
     float loose = blast * (1.0 - t2);
@@ -144,7 +154,7 @@ export const morphVertex = /* glsl */ `
     float influence = 1.0 - smoothstep(0.0, uCursorRadius, d);
     pos += normalize(toCursor + 1e-5) * influence * uPush;
 
-    // Highlight the hovered half once the tree exists.
+    // Highlight the hovered half once the halo exists.
     vHighlight = uTreeMix * step(0.5, aSide * uHoverSide) + influence * 0.6;
 
     /*

@@ -20,9 +20,9 @@ export function MorphStage() {
       <div className="pointer-events-none sticky top-0 flex h-screen items-end justify-center pb-16">
         <p className="max-w-md text-center text-[11px] uppercase tracking-[0.22em] text-ink-dim/70">
           <span className="sr-only">
-            An animated sequence: a portrait bust rendered as particles bursts apart,
-            then the fragments gather into a branching tree. The left branches lead
-            to experience and education, the right to projects.
+            An animated sequence: a pair of eyes rendered as particles closes and
+            bursts apart, then the fragments settle around a pair of doors. The
+            left door leads to experience and education, the right to projects.
           </span>
           <span aria-hidden="true">scroll</span>
         </p>

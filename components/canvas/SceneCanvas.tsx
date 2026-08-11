@@ -25,7 +25,7 @@ function Bay({ tier }: { tier: "high" | "low" }) {
           // Console only. What clicking should ultimately do is deliberately
           // undecided; the sections it used to scroll to have been removed.
           const label = side === "left" ? "work & education" : "projects";
-          console.log(`[tree] clicked: ${side} → ${label}`);
+          console.log(`[door] opened: ${side} → ${label}`);
         }}
       />
     </>
