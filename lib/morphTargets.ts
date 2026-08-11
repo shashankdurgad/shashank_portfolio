@@ -127,8 +127,15 @@ export function treePositions(
 
 /* ------------------------------------------------------------------ */
 
-/** Particle count per quality tier. Same N across every stage. */
-export const PARTICLES = { high: 40000, low: 12000 } as const;
+/**
+ * Particle count per quality tier. Same N across every stage.
+ *
+ * Raised alongside the smaller sprite size in MorphField: finer grain needs
+ * more points to keep the cloud reading as a volume rather than a spray. The
+ * cost is close to free — these are unlit, untextured points with no per-frame
+ * buffer rewrites, so the whole morph stays a single draw call whatever N is.
+ */
+export const PARTICLES = { high: 70000, low: 20000 } as const;
 
 /**
  * Per-particle random unit direction, used to scatter the explosion so the

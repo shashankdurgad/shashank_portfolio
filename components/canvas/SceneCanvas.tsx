@@ -38,6 +38,34 @@ function Bay({ tier }: { tier: "high" | "low" }) {
  * pointer-events:none keeps the HTML above fully interactive — the scene is
  * scenery, never an input surface.
  */
+/**
+ * Resolution to render at, as a [min, max] DPR range.
+ *
+ * On a 1x display the browser gives no supersampling of its own, so every
+ * particle edge lands on a whole pixel and the cloud reads as a grid of dots
+ * rather than a volume. Rendering above native and letting the GPU downscale
+ * supplies the smoothing the panel cannot — the one fix that genuinely helps a
+ * low-DPR monitor, since nothing else can add samples that aren't there.
+ *
+ * Only applied where it is both needed and affordable: high tier, and only
+ * when devicePixelRatio is 1. A 2x display already has the samples, and the
+ * low tier is where a weak GPU is assumed. The eyes shade roughly one
+ * full-screen pass worth of fragments at 2x, which is a light load for the
+ * hardware the high tier already implies.
+ */
+function renderScale(tier: "high" | "low"): number | [number, number] {
+  const base = BUDGET[tier].dpr;
+  if (tier !== "high" || typeof window === "undefined") return base;
+
+  /*
+   * A scalar, not a range. R3F's calculateDpr clamps devicePixelRatio into
+   * whatever [min, max] it is given, so the array form can never exceed the
+   * display's own density — [1, 2] on a 1x panel resolves to exactly 1. Only
+   * a fixed number renders above native and gets the downscale.
+   */
+  return window.devicePixelRatio === 1 ? 2 : base;
+}
+
 export function SceneCanvas() {
   const tier = useQuality((s) => s.tier);
   const ready = useQuality((s) => s.ready);
@@ -53,7 +81,7 @@ export function SceneCanvas() {
       data-scene-tier={tier}
     >
       <Canvas
-        dpr={BUDGET[tier].dpr}
+        dpr={renderScale(tier)}
         gl={{ antialias: tier === "high", powerPreference: "high-performance" }}
         camera={{ fov: 52, near: 0.1, far: 160, position: [0, 1.75, 4] }}
         /*

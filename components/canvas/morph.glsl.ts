@@ -138,6 +138,24 @@ export const morphVertex = /* glsl */ `
     vPart = aPart;
     vHidden = 1.0 - hidden;
 
+    /*
+     * Feather the open lid's leading edge.
+     *
+     * The lid's particles stop dead at their margin, which draws a hard line
+     * across the eye — masked while the render was coarse, obvious once the
+     * grain got fine enough to resolve it. Fading alpha over the outer part of
+     * the lid lets it dissolve into the sclera instead.
+     *
+     * Keyed to how far each point sits from its own pole, and only while the
+     * lid is open: a shut lid must stay opaque or the iris shows through the
+     * very thing meant to hide it.
+     */
+    if (aPart > 2.5) {
+      float openPolar = acos(clamp(normalize(local).y * sign(aLid), -1.0, 1.0));
+      float edge = 1.0 - smoothstep(0.45, 0.8, openPolar);
+      vHidden *= mix(edge, 1.0, uBlink);
+    }
+
     vec4 mv = modelViewMatrix * vec4(pos, 1.0);
     vDepth = -mv.z;
 
@@ -183,7 +201,16 @@ export const morphVertex = /* glsl */ `
      * of the render constant at every breakpoint.
      */
     float fieldScale = length(modelMatrix[0].xyz);
-    gl_PointSize = uSize * grow * fieldScale * (1.0 + influence * 1.4)
+
+    /*
+     * Per-particle size jitter. Identically sized sprites on a regular sample
+     * pattern read as a mechanical dot grid, which is a large part of what
+     * makes the cloud look low-resolution. Varying each point by +/-25% off
+     * its own seed breaks that up at no cost.
+     */
+    float jitter = 0.75 + aSeed * 0.5;
+
+    gl_PointSize = uSize * grow * fieldScale * jitter * (1.0 + influence * 1.4)
       * (14.0 / max(vDepth, 0.5));
   }
 `;
@@ -201,11 +228,25 @@ export const morphFragment = /* glsl */ `
   varying float vHidden;
 
   void main() {
-    // Round, soft-edged points; discard the corners of the quad.
+    /*
+     * Round points with a gaussian-ish falloff, rather than a disc with a
+     * soft rim.
+     *
+     * The old smoothstep(0.5, 0.15, r) left a flat core across 70% of the
+     * sprite and confined the fade to the outer band — roughly 1.5px at
+     * dpr 1. On a 1x display that reads as a hard-edged blob, so the cloud
+     * looks like a cluster of dots instead of a continuous volume. Fading
+     * all the way from the centre spreads the gradient across the whole
+     * sprite, which costs nothing and lets neighbouring particles blend into
+     * each other at any pixel density.
+     */
     vec2 c = gl_PointCoord - 0.5;
     float r = length(c);
     if (r > 0.5) discard;
-    float alpha = smoothstep(0.5, 0.15, r);
+    float alpha = smoothstep(0.5, 0.0, r);
+    // Slight bias back toward the centre so particles keep a definite core
+    // and the cloud does not turn into an undifferentiated haze.
+    alpha *= alpha;
 
     vec3 col = mix(uColor, uAccent, clamp(vHighlight, 0.0, 1.0));
     // Fade with distance so the cloud has depth rather than reading flat.
@@ -235,6 +276,12 @@ export const morphFragment = /* glsl */ `
 
     // Additive blending stacks alpha; keep it low so density reads as
     // structure instead of saturating to white.
-    gl_FragColor = vec4(col, alpha * uOpacity * fog * vFacing * gain * vHidden * 0.46);
+    /*
+     * 1.2, not 0.46. The gaussian falloff above integrates to ~38% of the
+     * brightness the old disc carried, so the same master alpha would render
+     * the cloud dim enough to lose the structure the ramp is there to create.
+     * The factor restores the previous total energy per particle.
+     */
+    gl_FragColor = vec4(col, alpha * uOpacity * fog * vFacing * gain * vHidden * 1.2);
   }
 `;

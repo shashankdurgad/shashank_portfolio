@@ -48,7 +48,14 @@ const pointer = new THREE.Vector2();
 function makeUniforms(detail: "high" | "low") {
   return {
     uProgress: { value: 0 },
-    uSize: { value: detail === "high" ? 2.2 : 3.0 },
+    /*
+     * Smaller sprites than the bust used. At dpr 1 a 2.2 sprite draws ~9px
+     * across, large enough that individual particles read as discrete dots
+     * rather than a volume. Measured coverage at the old settings was ~22x —
+     * far more overlap than the look needs — so trading size for count keeps
+     * the cloud dense while making its grain finer.
+     */
+    uSize: { value: detail === "high" ? 1.4 : 2.2 },
     uCursor: { value: new THREE.Vector3(999, 999, 999) },
     uCursorRadius: { value: 0.38 },
     uPush: { value: 0.3 },
