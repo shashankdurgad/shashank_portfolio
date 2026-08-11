@@ -21,6 +21,46 @@ const PROFILE = {
   },
 };
 
+/*
+ * Contact marks, inlined as SVG paths.
+ *
+ * Inline rather than an icon package or files in public/: three glyphs do not
+ * justify a dependency, and inlining keeps them in the same request as the
+ * markup with no flash of unstyled icon. They inherit currentColor so the
+ * chip's hover transition carries them along.
+ *
+ * The email icon is a generic envelope, not the Gmail mark. `mailto:` opens
+ * whichever client the visitor actually uses, so a Gmail logo would claim a
+ * relationship with a product that is not necessarily involved.
+ */
+const EnvelopeIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h17A1.5 1.5 0 0 1 22 5.5v.4l-10 5.6L2 5.9v-.4Zm0 2.7V18.5A1.5 1.5 0 0 0 3.5 20h17a1.5 1.5 0 0 0 1.5-1.5V8.2l-9.6 5.4a1 1 0 0 1-.8 0L2 8.2Z" />
+  </svg>
+);
+
+const GitHubIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.4 4.7 18.4 5 18.4 5c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z" />
+  </svg>
+);
+
+const LinkedInIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM2.4 21.5h5.2V9.5H2.4v12ZM10 9.5h5v1.6a5.5 5.5 0 0 1 4.9-2.4c3.2 0 4.7 1.9 4.7 5.6v7.2h-5.2v-6.7c0-1.7-.6-2.7-2-2.7-1.2 0-1.9.8-2.2 1.6-.1.3-.1.7-.1 1.1v6.7H10V9.5Z" />
+  </svg>
+);
+
+/**
+ * Contact links, rendered as chips. Each carries the token its glow keys off,
+ * so the three read as one family without hard-coding colours in the markup.
+ */
+const CONTACTS = [
+  { label: "Email", icon: EnvelopeIcon, glow: "var(--color-arc)", href: `mailto:${PROFILE.email}` },
+  { label: "GitHub", icon: GitHubIcon, glow: "var(--color-cyan)", href: PROFILE.links.github },
+  { label: "LinkedIn", icon: LinkedInIcon, glow: "var(--color-cyan)", href: PROFILE.links.linkedin },
+] as const;
+
 const fade = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const rise = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 
@@ -98,31 +138,25 @@ export function Hero() {
             variants={fade}
             animate={show}
             transition={{ delay: 0.6, duration: 0.6 }}
-            className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 font-mono text-[12px] uppercase tracking-[0.16em] lg:justify-end"
+            className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3 font-mono text-[12px] uppercase tracking-[0.16em] lg:justify-end"
           >
-            <a
-              className="border-b border-arc/40 pb-0.5 text-arc transition-colors hover:border-arc hover:text-ink"
-              href={`mailto:${PROFILE.email}`}
-            >
-              Email
-            </a>
-            <a
-              className="border-b border-line pb-0.5 text-ink-dim transition-colors hover:border-cyan hover:text-cyan"
-              href={PROFILE.links.github}
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>
-            <a
-              className="border-b border-line pb-0.5 text-ink-dim transition-colors hover:border-cyan hover:text-cyan"
-              href={PROFILE.links.linkedin}
-              target="_blank"
-              rel="noreferrer"
-            >
-              LinkedIn
-            </a>
-            <span className="text-ink-dim/70">{PROFILE.location}</span>
+            {CONTACTS.map(({ label, icon: Icon, glow, href }) => (
+              <a
+                key={label}
+                className="bp-chip"
+                style={{ ["--chip" as string]: glow }}
+                href={href}
+                // mailto: must stay in the current tab; a new tab would open
+                // and immediately blank when the mail client takes over.
+                {...(href.startsWith("mailto:")
+                  ? {}
+                  : { target: "_blank", rel: "noreferrer" })}
+              >
+                <Icon />
+                {label}
+              </a>
+            ))}
+            <span className="ml-1 text-ink-dim/70">{PROFILE.location}</span>
           </motion.div>
         </div>
       </div>

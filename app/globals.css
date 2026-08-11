@@ -81,6 +81,74 @@ button,
     0 0 40px color-mix(in srgb, var(--color-arc) 18%, transparent);
 }
 
+/*
+ * Contact chips — bordered pills that glow on hover.
+ *
+ * The glow is layered deliberately: an outer box-shadow for the halo in the
+ * surrounding dark, an inset one to light the pill from within, and a text
+ * shadow so the label itself reads as emissive rather than merely tinted.
+ * A single shadow gives a flat ring that looks pasted onto the dark backdrop.
+ */
+.bp-chip {
+  --chip: var(--color-ink-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  /*
+   * Resting contrast is load-bearing, not decorative. --color-line at 90% put
+   * the border at 1.04:1 against the page and --color-ink-dim put the label at
+   * 4.24:1 — an invisible box around text that fell under the 4.5:1 AA floor.
+   * A chip has to read as a control before it is hovered, so both are keyed to
+   * brighter tokens: --color-ink for the label, and the chip's own accent at
+   * 55% for the border, which clears 3:1 for a UI boundary.
+   */
+  border: 1px solid color-mix(in srgb, var(--chip) 55%, transparent);
+  /* Rectangular with softened corners — the schematic linework elsewhere is
+     all straight edges, which a full pill radius reads against. */
+  border-radius: 4px;
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-panel) 70%, transparent);
+  transition:
+    color 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.bp-chip svg {
+  width: 0.95em;
+  height: 0.95em;
+  /* Let the mark inherit the chip's colour so both animate together. */
+  fill: currentColor;
+  flex: none;
+}
+
+/*
+ * Hover has to clear a brighter resting state than before, so it goes to the
+ * full accent on both border and label rather than the 70% it used when rest
+ * was near-invisible.
+ */
+.bp-chip:hover,
+.bp-chip:focus-visible {
+  color: var(--chip);
+  border-color: var(--chip);
+  background: color-mix(in srgb, var(--chip) 16%, transparent);
+  box-shadow:
+    0 0 20px color-mix(in srgb, var(--chip) 38%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--chip) 16%, transparent);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--chip) 55%, transparent);
+}
+
+/*
+ * Keyboard focus needs a ring the hover glow does not provide — the glow
+ * alone is too diffuse to read as a focus indicator against the dark page.
+ */
+.bp-chip:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--chip) 80%, transparent);
+  outline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
