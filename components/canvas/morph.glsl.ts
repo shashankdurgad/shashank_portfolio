@@ -23,6 +23,13 @@ export const morphVertex = /* glsl */ `
   uniform vec2  uGazeL;      // left eye yaw/pitch, radians
   uniform vec2  uGazeR;      // right eye yaw/pitch, radians
   uniform float uBlink;      // 0 open, 1 shut
+  uniform float uHoverGrow;  // 0..1, eased on the CPU; scales the hovered tree
+
+  /*
+   * Where both trunks meet the ground — see growBranches in morphTargets.
+   * The hover grow scales about this point so the trees stay rooted.
+   */
+  const vec3 TREE_BASE = vec3(0.0, -1.15, 0.0);
 
   attribute vec3  aNormal;      // surface normal
   attribute vec3  aScatter;     // per-particle random unit direction
@@ -106,6 +113,22 @@ export const morphVertex = /* glsl */ `
     // Second half: the dispersed cloud contracts into the tree.
     float t2 = smoothstep(0.0, 1.0, clamp(p - 1.0, 0.0, 1.0));
     vec3 pos = mix(blown, aTree, t2);
+
+    /*
+     * Hover grow. The hovered tree swells to signal that it is clickable.
+     *
+     * Scaled about the shared trunk base, not each tree's own centroid. Both
+     * trunks start at the same point on the ground, so scaling about a
+     * centroid would lift them off it and open a gap at the join. Growing
+     * from the base keeps them rooted and splays the canopy outward, which
+     * reads as the tree growing rather than merely inflating.
+     *
+     * Gated on uTreeMix because this same code runs at every morph stage —
+     * without it the eyes and the explosion would scale on hover too.
+     */
+    float mine = step(0.5, aSide * uHoverSide);
+    float hoverScale = 1.0 + mine * uHoverGrow * uTreeMix * 0.15;
+    pos = TREE_BASE + (pos - TREE_BASE) * hoverScale;
 
     // Turbulence, strongest mid-explosion where the cloud is loosest.
     float loose = blast * (1.0 - t2);

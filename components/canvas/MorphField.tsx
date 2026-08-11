@@ -60,6 +60,7 @@ function makeUniforms(detail: "high" | "low") {
     uCursorRadius: { value: 0.38 },
     uPush: { value: 0.3 },
     uHoverSide: { value: 0 },
+    uHoverGrow: { value: 0 },
     uTreeMix: { value: 0 },
     uTime: { value: 0 },
     uForm: { value: 1 },
@@ -212,6 +213,19 @@ export function MorphField({
     const vis = 1 - THREE.MathUtils.smoothstep(p, 2.05, 2.4);
     u.uOpacity.value += (vis - u.uOpacity.value) * Math.min(1, delta * 4);
 
+    /*
+     * Ease the hover grow rather than snapping it, which would pop. Faster in
+     * than out so the tree answers the pointer promptly but settles back
+     * unhurriedly — the reverse reads as sluggish then twitchy.
+     *
+     * Driven off the uniform rather than the React state: it already carries
+     * the hovered side, which keeps the frame loop free of the closure.
+     */
+    const wantGrow = u.uHoverSide.value === 0 ? 0 : 1;
+    const growRate = wantGrow > u.uHoverGrow.value ? 11 : 7;
+    u.uHoverGrow.value +=
+      (wantGrow - u.uHoverGrow.value) * Math.min(1, delta * growRate);
+
     if (group.current) {
       // Cursor plane faces the camera through the field's centre. The group
       // never rotates now, so the hit point needs no un-rotation to reach
@@ -282,6 +296,8 @@ export function MorphField({
         blink: +blink.current.value.toFixed(4),
         cursor: [+localCursor.x.toFixed(3), +localCursor.y.toFixed(3)],
         morph: +p.toFixed(4),
+        hoverSide: u.uHoverSide.value,
+        hoverGrow: +u.uHoverGrow.value.toFixed(4),
       };
     }
     /* eslint-enable react-hooks/immutability */
@@ -337,7 +353,15 @@ export function MorphField({
             onSelect(side);
           }}
         >
-          <planeGeometry args={[1.8, 2.4]} />
+          {/*
+            Sized to bound the grown tree, not the resting one. A plane that
+            only covered the resting canopy would leave the grown fringe
+            hoverable but not hit-testable, and near the edge that oscillates:
+            pointer enters, tree grows past the plane, pointer is outside,
+            tree shrinks back under the pointer, and the hover flickers. The
+            planes are invisible, so the extra margin costs nothing.
+          */}
+          <planeGeometry args={[2.1, 2.8]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
       ))}
