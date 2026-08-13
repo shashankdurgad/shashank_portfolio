@@ -234,17 +234,25 @@ timeline — the Projects door owns them.
 
 ---
 
-## 8. Dead code, kept on purpose
+## 8. Legacy names, and checking for dead code
 
-- `lib/faceSampler.ts`, `lib/spin.ts`, `components/ui/Panel.tsx` — unused.
-- `public/models/head.glb` (6.4 MB) — no longer loaded by anything.
-
-Safe to delete, but check first: `grep -rl 'from "@/lib/<name>"' components lib app`.
-
-**Legacy names that are not what they say:** `aTree` and `uTreeMix` date from
-when the final stage was a pair of fractal trees. They mean *final-stage target*
-and *final stage has formed*. Renaming touches several files for no behavioural
+**Names that are not what they say:** `aTree` and `uTreeMix` date from when the
+final stage was a pair of fractal trees. They mean *final-stage target* and
+*final stage has formed*. Renaming touches several files for no behavioural
 gain; the shader header documents this.
+
+The scene has been rebuilt several times — a bust, a brain, wings, a swarm —
+and each pass tends to strand a module. Before deleting anything, check both
+the import and the symbols it exports, since a module can be dead while a name
+it exports lives on elsewhere:
+
+```bash
+grep -rn '@/lib/<name>' app components lib          # imports
+grep -rn '\b<ExportedSymbol>\b' app components lib  # uses of what it exports
+```
+
+Watch for matches inside comments — prose mentioning an old approach is not a
+dependency. That is the difference between a safe delete and a broken build.
 
 ---
 
