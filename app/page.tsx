@@ -1,6 +1,9 @@
 import { SceneRoot } from "@/components/canvas/SceneRoot";
 import { Hero } from "@/components/sections/Hero";
 import { MorphStage } from "@/components/sections/MorphStage";
+import { TimelineStage } from "@/components/sections/TimelineStage";
+import { TimelineCardHost } from "@/components/ui/TimelineCardHost";
+import { DoorExit } from "@/components/ui/DoorExit";
 
 export default function Home() {
   return (
@@ -24,7 +27,11 @@ export default function Home() {
       <main id="main" className="relative z-10">
         <Hero />
         <MorphStage />
+        <TimelineStage />
       </main>
+
+      <TimelineCardHost />
+      <DoorExit />
     </>
   );
 }

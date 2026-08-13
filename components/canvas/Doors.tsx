@@ -5,6 +5,8 @@ import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import { ANGLES, DOOR, DOOR_CENTRE, LABELS, SWING, hingeX } from "@/lib/doors";
+import { useDoorStore } from "@/lib/doorStore";
+import { scroll } from "@/lib/scrollStore";
 
 /**
  * The two doors: hover peeks them open, click swings them wide.
@@ -66,6 +68,7 @@ function Door({
 
   const [hovered, setHovered] = useState(false);
   const [opened, setOpened] = useState(false);
+  const entered = useDoorStore((s) => s.entered);
 
   useFrame((_, delta) => {
     if (!pivot.current) return;
@@ -84,14 +87,41 @@ function Door({
     if (root.current) root.current.visible = v > 0.01;
 
     /*
-     * Opening is a commitment: once clicked the door stays open, so the target
-     * ignores hover. Hover only governs the peek while still shut.
+     * Opening is a commitment while the reader is through: the target ignores
+     * hover, so the door does not twitch as the pointer passes.
+     *
+     * Leaving closes it again, but only once the flight out has carried the
+     * camera clear. Shutting it while still travelling would swing the panel
+     * through the viewer, and they would watch it close from inside the
+     * doorway rather than see it close behind them.
      */
-    const target = opened
+    const flownOut = !entered && scroll.doorFlight < 0.35;
+    const held = opened && !flownOut;
+
+    const target = held
       ? ANGLES.open
-      : live && hovered
+      : live && hovered && !opened
         ? ANGLES.peek
         : ANGLES.rest;
+
+    if (process.env.NODE_ENV !== "production" && side === -1) {
+      // Test hook: the resting angle is the thing to assert, and it cannot be
+      // read reliably from a screenshot.
+      (window as unknown as { __doorAngle?: number }).__doorAngle =
+        pivot.current.rotation.y;
+    }
+
+    /*
+     * Drop the latch once the door has swung back past the peek, so a later
+     * hover peeks again rather than being read as a still-open door.
+     *
+     * Tested against the peek angle, not zero: the pointer is usually still
+     * over the door that was just clicked, so it settles at the peek and never
+     * reaches zero — a stricter threshold leaves the latch set forever.
+     */
+    if (opened && flownOut && Math.abs(pivot.current.rotation.y) <= ANGLES.peek + 0.02) {
+      setOpened(false);
+    }
 
     /*
      * Signed per side so both doors swing toward the viewer rather than into
@@ -188,7 +218,7 @@ function Door({
           onClick={(e) => {
             if ((visible.current ?? 0) <= 0.5) return;
             e.stopPropagation();
-            setOpened((o) => !o);
+            setOpened(true);
             onOpen();
           }}
         >

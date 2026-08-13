@@ -23,6 +23,7 @@ export const morphVertex = /* glsl */ `
   uniform float uPush;
   uniform float uHoverSide;     // -1 left, +1 right, 0 none
   uniform float uTreeMix;       // 1 once the final stage has formed
+  uniform float uThreadMix;     // 0 halo, 1 gathered into the timeline thread
   uniform float uTime;
   uniform float uForm;       // 1 while the eyes are intact, 0 once dispersed
   uniform vec2  uGazeL;      // left eye yaw/pitch, radians
@@ -42,6 +43,7 @@ export const morphVertex = /* glsl */ `
   attribute vec3  aNormal;      // surface normal
   attribute vec3  aScatter;     // per-particle random unit direction
   attribute vec3  aTree;        // final-stage target: the doorway halo
+  attribute vec3  aThread;      // where the halo settles once through a door
   attribute float aSide;
   attribute float aSeed;
   attribute float aEye;         // -1 left eye, +1 right
@@ -127,6 +129,14 @@ export const morphVertex = /* glsl */ `
      */
     float t2 = smoothstep(0.0, 1.0, clamp(p - 1.0, 0.0, 1.0));
     vec3 pos = mix(blown, aTree, t2);
+
+    /*
+     * Going through a door draws the halo into the timeline thread, so the
+     * same matter that framed the doorway becomes the line being travelled.
+     * Blended rather than swapped: the point of carrying one particle system
+     * through every stage is that nothing ever spawns or dies.
+     */
+    pos = mix(pos, aThread, uThreadMix * t2);
 
 
     /*

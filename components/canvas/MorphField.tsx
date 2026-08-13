@@ -7,6 +7,8 @@ import { ProceduralEyeSource } from "@/lib/eyeGeometry";
 import { eyePositions } from "@/lib/eyeTargets";
 import { createBlink, createGaze, stepBlink, stepGaze } from "@/lib/gaze";
 import { haloPositions } from "@/lib/haloTargets";
+import { timelinePositions } from "@/lib/timelineCurve";
+import { TIMELINE_ORIGIN } from "./Timeline";
 import { Doors } from "./Doors";
 import { PARTICLES, rng, scatterDirections } from "@/lib/morphTargets";
 import { scroll } from "@/lib/scrollStore";
@@ -63,6 +65,7 @@ function makeUniforms(detail: "high" | "low") {
     uPush: { value: 0.3 },
     uHoverSide: { value: 0 },
     uHoverGrow: { value: 0 },
+    uThreadMix: { value: 0 },
     uTreeMix: { value: 0 },
     uTime: { value: 0 },
     uForm: { value: 1 },
@@ -142,6 +145,21 @@ export function MorphField({
    */
   const halo = useMemo(() => haloPositions(count), [count]);
 
+  /*
+   * Where the halo goes once a door is entered. Offset to the timeline group's
+   * own origin, since these are positions in the field's local space and the
+   * thread is drawn as a separate group.
+   */
+  const thread = useMemo(() => {
+    const p = timelinePositions(count);
+    for (let i = 0; i < count; i++) {
+      p[i * 3] += TIMELINE_ORIGIN[0];
+      p[i * 3 + 1] += TIMELINE_ORIGIN[1] - 1.5;
+      p[i * 3 + 2] += TIMELINE_ORIGIN[2];
+    }
+    return p;
+  }, [count]);
+
   /** 0 until the doors are on screen; gates their interactivity. */
   const doorsVisible = useRef(0);
 
@@ -209,6 +227,20 @@ export function MorphField({
     u.uProgress.value += (target - u.uProgress.value) * Math.min(1, delta * 3.4);
 
     const p = u.uProgress.value;
+
+    /*
+     * How far into the timeline region the page has scrolled.
+     *
+     * The doors and the halo both fade out on this. morph is clamped at 2 and
+     * simply stays there, so keying off it alone left them mounted forever —
+     * the camera then flew through the doors at point-blank range once the
+     * timeline began, smearing the panels and their labels across the frame.
+     */
+    const leaving = THREE.MathUtils.smoothstep(scroll.timeline, 0.0, 0.05);
+
+    // The halo gathers into the thread as the flight carries the camera
+    // through, so the doorway's atmosphere becomes the line beyond it.
+    u.uThreadMix.value = scroll.doorFlight;
     u.uTreeMix.value = THREE.MathUtils.smoothstep(p, 1.6, 1.95);
     // Depth-fading only applies while the eyes are a coherent surface. Held
     // until the lids have shut, so the closed pose keeps its silhouette.
@@ -222,7 +254,14 @@ export function MorphField({
      * pair of bright blobs. It now settles to a faint atmosphere instead of
      * competing with the thing it is meant to frame.
      */
-    const vis = 1 - THREE.MathUtils.smoothstep(p, 1.6, 1.95) * 0.55;
+    /*
+     * `leaving` fades the halo out as the timeline section is scrolled into.
+     * Going through a door is the exception: there the same particles become
+     * the thread, so fading them would erase the very thing being formed.
+     */
+    const vis =
+      (1 - THREE.MathUtils.smoothstep(p, 1.6, 1.95) * 0.55) *
+      (1 - leaving * (1 - scroll.doorFlight));
     u.uOpacity.value += (vis - u.uOpacity.value) * Math.min(1, delta * 4);
 
     /*
@@ -230,7 +269,12 @@ export function MorphField({
      * their own materials handle the fade — this only gates interactivity and
      * tells them how far along the stage is.
      */
-    doorsVisible.current = THREE.MathUtils.smoothstep(p, 1.6, 1.95);
+    doorsVisible.current =
+      THREE.MathUtils.smoothstep(p, 1.6, 1.95) *
+      (1 - leaving) *
+      // Fade as the camera passes the door plane, so the panels do not hang
+      // in frame behind the viewer once they are through.
+      (1 - THREE.MathUtils.smoothstep(scroll.doorFlight, 0.45, 0.9));
 
     /*
      * Ease the hover grow rather than snapping it, which would pop. Faster in
@@ -316,6 +360,9 @@ export function MorphField({
         cursor: [+localCursor.x.toFixed(3), +localCursor.y.toFixed(3)],
         morph: +p.toFixed(4),
         doors: +doorsVisible.current.toFixed(4),
+        doorAngle: +(
+          (window as unknown as { __doorAngle?: number }).__doorAngle ?? 0
+        ).toFixed(4),
         hoverSide: u.uHoverSide.value,
         hoverGrow: +u.uHoverGrow.value.toFixed(4),
       };
@@ -330,6 +377,7 @@ export function MorphField({
           <bufferAttribute attach="attributes-aNormal" args={[eyes.normals, 3]} />
           <bufferAttribute attach="attributes-aScatter" args={[scatter, 3]} />
           <bufferAttribute attach="attributes-aTree" args={[halo.positions, 3]} />
+          <bufferAttribute attach="attributes-aThread" args={[thread, 3]} />
           <bufferAttribute attach="attributes-aSide" args={[halo.sides, 1]} />
           <bufferAttribute attach="attributes-aSeed" args={[seeds, 1]} />
           <bufferAttribute attach="attributes-aEye" args={[eyes.eye, 1]} />

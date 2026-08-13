@@ -5,10 +5,12 @@ import { Canvas } from "@react-three/fiber";
 import { Preload } from "@react-three/drei";
 import * as THREE from "three";
 import { BUDGET, useQuality } from "@/lib/quality";
+import { useDoorStore } from "@/lib/doorStore";
 import { BayFloor } from "./BayFloor";
 import { MorphField } from "./MorphField";
 import { ProgressBridge } from "./ProgressBridge";
 import { Starfield } from "./Starfield";
+import { TimelineScene } from "./TimelineScene";
 import { Rig } from "./Rig";
 
 function Bay({ tier }: { tier: "high" | "low" }) {
@@ -22,12 +24,15 @@ function Bay({ tier }: { tier: "high" | "low" }) {
       <MorphField
         detail={tier}
         onSelect={(side) => {
-          // Console only. What clicking should ultimately do is deliberately
-          // undecided; the sections it used to scroll to have been removed.
-          const label = side === "left" ? "work & education" : "projects";
-          console.log(`[door] opened: ${side} → ${label}`);
+          /*
+           * Only the left door leads anywhere so far. The right one opens as
+           * before but has nothing behind it yet, so entering it would fly the
+           * camera into empty space.
+           */
+          if (side === "left") useDoorStore.getState().enter(side);
         }}
       />
+      <TimelineScene />
     </>
   );
 }
