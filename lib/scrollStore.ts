@@ -15,6 +15,22 @@ export const scroll = {
    * Driven by its own ScrollTrigger, independent of page progress.
    */
   morph: 0,
+  /**
+   * 0..1 across the work & education timeline region, driven by its own
+   * ScrollTrigger. Independent of `morph` so the two regions can be paced
+   * separately.
+   */
+  timeline: 0,
+  /**
+   * 0 outside a door, 1 fully through it. Eased by the rig each frame.
+   *
+   * Lives here rather than beside the door's React state for the same reason
+   * the values above do — it changes every frame and only the frame loop reads
+   * it. Keeping it here also means the timeline can react to the flight
+   * without importing the door module, which would make the two mutually
+   * dependent: the flight already reads the timeline's curve.
+   */
+  doorFlight: 0,
 };
 
 export type ScrollState = typeof scroll;
