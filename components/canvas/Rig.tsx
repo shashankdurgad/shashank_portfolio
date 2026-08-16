@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { CAMERA_POSITION, CAMERA_TARGET } from "@/lib/constants";
@@ -78,6 +79,29 @@ if (typeof window !== "undefined") {
 export function Rig({ pointer = true }: { pointer?: boolean }) {
   const entered = useDoorStore((s) => s.entered);
 
+  /*
+   * Whether this is a phone-width viewport, kept in a ref so the frame loop
+   * can read it without a render. Matches the 640px breakpoint the hero's
+   * layout and the field's scale both key off.
+   */
+  const phone = useRef(false);
+  /** Viewport height, cached so the frame loop never reads layout. */
+  const vh = useRef(900);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const sync = () => {
+      phone.current = mq.matches;
+      vh.current = window.innerHeight;
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    window.addEventListener("resize", sync, { passive: true });
+    return () => {
+      mq.removeEventListener("change", sync);
+      window.removeEventListener("resize", sync);
+    };
+  }, []);
+
   useFrame((state, dt) => {
     /*
      * Flight through a door, eased on a clock rather than on scroll.
@@ -127,6 +151,48 @@ export function Rig({ pointer = true }: { pointer?: boolean }) {
 
     tmpPos.copy(CAMERA_POSITION);
     target.copy(CAMERA_TARGET);
+
+    /*
+     * On a phone, sit closer to the subject and aim slightly above it.
+     *
+     * Only while outside a door and before the burst — the flight, the rail
+     * and the hall all set the camera themselves further down, so this cannot
+     * fight them.
+     *
+     * The problem being solved here is framing, not size: the field sits at
+     * y=1.5 above a floor at y=0, so on a tall phone the grid's horizon cuts
+     * straight across the base of the eyes and they read as half-sunk into it.
+     * Aiming a little above the subject lifts it clear of that line.
+     *
+     * Size is left to the field's own scale. Dollying in as well was tried and
+     * overshot badly — the two compound, and at 1.45 units closer the pair ran
+     * off both edges of a 412px-wide screen. The small nudge that remains is
+     * for depth, not scale.
+     */
+    if (phone.current && scroll.doorFlight < 0.001) {
+      const settle = 1 - THREE.MathUtils.smoothstep(scroll.morph, 0, 0.6);
+      tmpPos.z -= 0.35 * settle;
+
+      /*
+       * Aiming *below* the subject lifts it up the frame, and short phones
+       * need more of that lift.
+       *
+       * The sign matters and is easy to get backwards: raising the look-at
+       * point tilts the camera up, which carries the subject down the screen.
+       * The first attempt here added to target.y and drove the eyes straight
+       * into the blurb — the opposite of what was wanted.
+       *
+       * It has to be solved in the camera rather than the layout because the
+       * eyes are drawn centred on the viewport by a canvas that knows nothing
+       * about the DOM stack above it; on a cramped screen they land on the
+       * blurb however the grid rows are sized.
+       *
+       * Interpolated on height rather than switched at a breakpoint, so a
+       * handset between the two sizes gets a proportionate amount.
+       */
+      const cramped = 1 - THREE.MathUtils.smoothstep(vh.current, 570, 780);
+      target.y -= (0.18 + 0.42 * cramped) * settle;
+    }
 
     if (onRail > 0) {
       // Focus rides ahead of the camera, so the thread leads into frame.

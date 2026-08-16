@@ -218,7 +218,30 @@ export function MorphField({
   useEffect(() => {
     const fit = () => {
       const w = window.innerWidth;
-      setFieldScale(w < 640 ? 0.62 : w < 1024 ? 0.78 : 1.15);
+      if (w >= 640) {
+        // Desktop and tablet are unchanged: the eyes share the row with two
+        // columns of copy, so their size is bounded by that horizontal slot.
+        setFieldScale(w >= 1024 ? 1.15 : 0.78);
+        return;
+      }
+
+      /*
+       * On a phone the layout is a single stacked column, so the eyes have the
+       * full width to themselves and can be far larger than the flat 0.62 they
+       * used to get — a holdover from when a bust occupied this slot, which
+       * left the pair small and adrift in a band that is 40% of the screen on
+       * a tall phone.
+       *
+       * Both axes bind, and which one does depends on the handset. A pair of
+       * eyes is roughly 3.3x wider than it is tall, so on a narrow-but-tall
+       * phone width runs out first: sizing on height alone ran them off both
+       * edges of a 412px-wide Pixel 7. Taking the smaller of the two fits
+       * whichever axis is scarcer, and the clamp keeps the result sane at the
+       * extremes.
+       */
+      const byHeight = window.innerHeight / 880;
+      const byWidth = w / 540;
+      setFieldScale(THREE.MathUtils.clamp(Math.min(byHeight, byWidth), 0.62, 0.86));
     };
     fit();
     window.addEventListener("resize", fit);

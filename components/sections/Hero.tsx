@@ -135,8 +135,16 @@ export function Hero() {
        * the centre column left clear for the particle eyes behind. The grid
        * collapses to a single stacked column on small screens, where there is
        * no room to flank a centrepiece.
+       *
+       * The base padding and gap are set for the smallest phones and widen at
+       * `sm` upward. They used to start at the desktop figures, which made the
+       * hero 691px tall inside a 568px viewport on an iPhone SE — the LinkedIn
+       * chip and the location line were pushed off the bottom of the screen
+       * entirely. `min-h-dvh` rather than `min-h-screen` for the same reason:
+       * `100vh` on mobile Safari is the height with the browser chrome
+       * retracted, so it overflows by the toolbar's height until you scroll.
        */
-      className="relative grid min-h-screen w-full grid-rows-[auto_1fr_auto] gap-12 px-6 py-20 sm:gap-8 sm:px-10 sm:py-24 lg:px-14"
+      className="relative grid min-h-dvh w-full grid-rows-[auto_1fr_auto] gap-5 px-5 py-10 sm:gap-8 sm:px-10 sm:py-24 lg:px-14"
     >
       {/* ── Top-left: name, tagline ───────────────────────────────────── */}
       <div className="max-w-xl">
@@ -170,7 +178,27 @@ export function Hero() {
         have stalled is both the same instruction and a better one: it arrives
         because you paused, not because the page loaded.
       */}
-      <div className="flex items-end justify-center pb-4">
+      {/*
+        A floor on this row, so the eyes have a band of their own to sit in.
+
+        The row is `1fr`, which on a short phone collapsed to 70px — the eyes
+        are rendered centred on the viewport by the canvas behind, so they fell
+        straight through it and the blurb was drawn across them, with the
+        speech bubble ending up above them rather than below. Reserving the
+        space keeps the stack honest. Phones only: from `sm` up the row has
+        always had room to spare.
+
+        A fixed 38vh was tried first and pushed the contact chips back off the
+        bottom of both smaller phones — the copy above and below this row is a
+        near-constant height, so a proportional floor overruns exactly where
+        there is least room.
+
+        The floor therefore only applies above 360px of width. Below that the
+        three contact chips wrap onto two lines, which costs 45px, and a
+        320px-wide iPhone SE has no spare height to give the eyes as well; it
+        keeps the collapsing `1fr` row and the eyes simply sit tighter.
+      */}
+      <div className="flex items-end justify-center pb-4 min-[360px]:min-h-30 sm:min-h-0">
         <EyeDialogue />
       </div>
 
