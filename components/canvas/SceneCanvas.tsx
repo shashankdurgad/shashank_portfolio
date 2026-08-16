@@ -11,6 +11,7 @@ import { MorphField } from "./MorphField";
 import { ProgressBridge } from "./ProgressBridge";
 import { Starfield } from "./Starfield";
 import { TimelineScene } from "./TimelineScene";
+import { HallScene } from "./HallScene";
 import { Rig } from "./Rig";
 
 function Bay({ tier }: { tier: "high" | "low" }) {
@@ -23,16 +24,10 @@ function Bay({ tier }: { tier: "high" | "low" }) {
       <BayFloor divisions={budget.gridDivisions} />
       <MorphField
         detail={tier}
-        onSelect={(side) => {
-          /*
-           * Only the left door leads anywhere so far. The right one opens as
-           * before but has nothing behind it yet, so entering it would fly the
-           * camera into empty space.
-           */
-          if (side === "left") useDoorStore.getState().enter(side);
-        }}
+        onSelect={(side) => useDoorStore.getState().enter(side)}
       />
       <TimelineScene />
+      <HallScene />
     </>
   );
 }

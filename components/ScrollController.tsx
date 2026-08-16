@@ -122,8 +122,9 @@ export function ScrollController() {
        * flight attached, so the Back control has to be the only way out.
        */
       const clampFloor = () => {
-        if (!useDoorStore.getState().entered) return;
-        const el = document.querySelector("#timeline");
+        const entered = useDoorStore.getState().entered;
+        if (!entered) return;
+        const el = document.querySelector(entered === "right" ? "#hall" : "#timeline");
         if (!el) return;
         const floor = window.scrollY + el.getBoundingClientRect().top;
         if (window.scrollY < floor - 1) {

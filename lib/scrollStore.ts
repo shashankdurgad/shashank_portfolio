@@ -31,6 +31,17 @@ export const scroll = {
    * dependent: the flight already reads the timeline's curve.
    */
   doorFlight: 0,
+  /**
+   * Which door the flight belongs to: "left", "right", or null at rest.
+   *
+   * Distinct from the store's `entered`, which clears the instant Back is
+   * pressed. The flight out takes most of a second after that, and the scene
+   * behind the doorway has to stay drawn for the whole of it — keyed on
+   * `entered` alone, the timeline and the hall blinked out on the click and
+   * the viewer zoomed out of an empty doorway. Cleared once the flight has
+   * fully unwound.
+   */
+  doorSide: null as "left" | "right" | null,
 };
 
 export type ScrollState = typeof scroll;

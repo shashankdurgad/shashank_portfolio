@@ -2,7 +2,9 @@ import { SceneRoot } from "@/components/canvas/SceneRoot";
 import { Hero } from "@/components/sections/Hero";
 import { MorphStage } from "@/components/sections/MorphStage";
 import { TimelineStage } from "@/components/sections/TimelineStage";
+import { HallStage } from "@/components/sections/HallStage";
 import { TimelineCardHost } from "@/components/ui/TimelineCardHost";
+import { ProjectCardHost } from "@/components/ui/ProjectCardHost";
 import { DoorExit } from "@/components/ui/DoorExit";
 
 export default function Home() {
@@ -28,9 +30,11 @@ export default function Home() {
         <Hero />
         <MorphStage />
         <TimelineStage />
+        <HallStage />
       </main>
 
       <TimelineCardHost />
+      <ProjectCardHost />
       <DoorExit />
     </>
   );
