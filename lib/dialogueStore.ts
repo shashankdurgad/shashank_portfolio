@@ -30,23 +30,26 @@ import { signals, sweepDebug } from "./dialogueSignals";
 /**
  * Global gap between lines, in seconds.
  *
- * 6-10s, down from an original 20-30s. At the higher figure the eyes read as
- * sluggish in ordinary use: ninety seconds of deliberately provoking every
- * trigger produced only three lines, and a visitor does far less than that.
+ * 3-4.5s, down from an original 20-30s, which read as sluggish: ninety seconds
+ * of deliberately provoking every trigger produced only three lines.
+ *
+ * This is the gap `fast()` uses, but only the gap. That helper also cuts every
+ * per-trigger cooldown to a twentieth, and those two changes are not
+ * interchangeable — the cooldowns are what stop a single observation looping.
+ * With both applied, ninety seconds of exploration produced twenty-two lines
+ * including "that's as far as i turn" six times over. With the short gap and
+ * the cooldowns left alone it produced nine lines and no repeats at all.
+ *
+ * The effect is a conversation that answers quickly at first, four or five
+ * seconds apart, then spaces itself out as each trigger's own cooldown
+ * engages. Responsive without becoming a loop.
  *
  * The floor is set by how long a line occupies the bubble — typing plus a hold
- * of at least HOLD_MIN plus the fade, so roughly two and a half seconds. A gap
- * near that would mean one line leaving as the next arrives, with the bubble
- * almost never empty.
- *
- * This is deliberately slower than the 3s used by `fast()` below. That is a
- * testing pace and reads as chatter in a real visit; it is also only tolerable
- * there because it slashes the per-trigger cooldowns as well, which is what
- * stops the same observation repeating. Those cooldowns stay at full length
- * here, so variety across triggers is preserved.
+ * of at least HOLD_MIN plus the fade, so roughly two and a half seconds. Going
+ * below that would mean one line leaving as the next arrives.
  */
-const GAP_MIN = 6;
-const GAP_MAX = 10;
+const GAP_MIN = 3;
+const GAP_MAX = 4.5;
 
 /**
  * Live pacing, overridable by the dev hook below.
@@ -242,7 +245,7 @@ export function installDialogueHook() {
       console.log(
         on
           ? "%cdialogue FAST mode%c — ~3s between lines, no cap, persists across reloads. __dlg.off() to stop."
-          : "%cdialogue pacing restored%c — 6-10s gap, full cooldowns.",
+          : "%cdialogue pacing restored%c — 3-4.5s gap, full cooldowns.",
         "color:#2bb8d4;font-weight:bold",
         "color:#64748b",
       );
@@ -269,7 +272,7 @@ export function installDialogueHook() {
         /* storage unavailable */
       }
       console.log(
-        "%cdialogue back to normal%c — 6-10s gap, full cooldowns, no logging.",
+        "%cdialogue back to normal%c — 3-4.5s gap, full cooldowns, no logging.",
         "color:#2bb8d4;font-weight:bold",
         "color:#64748b",
       );
