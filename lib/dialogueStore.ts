@@ -27,35 +27,46 @@ import { signals, sweepDebug } from "./dialogueSignals";
  * may be read during render.
  */
 
-/** Global gap between lines, in seconds. Sparse by design — see below. */
-const GAP_MIN = 20;
-const GAP_MAX = 30;
+/**
+ * Global gap between lines, in seconds.
+ *
+ * 6-10s, down from an original 20-30s. At the higher figure the eyes read as
+ * sluggish in ordinary use: ninety seconds of deliberately provoking every
+ * trigger produced only three lines, and a visitor does far less than that.
+ *
+ * The floor is set by how long a line occupies the bubble — typing plus a hold
+ * of at least HOLD_MIN plus the fade, so roughly two and a half seconds. A gap
+ * near that would mean one line leaving as the next arrives, with the bubble
+ * almost never empty.
+ *
+ * This is deliberately slower than the 3s used by `fast()` below. That is a
+ * testing pace and reads as chatter in a real visit; it is also only tolerable
+ * there because it slashes the per-trigger cooldowns as well, which is what
+ * stops the same observation repeating. Those cooldowns stay at full length
+ * here, so variety across triggers is preserved.
+ */
+const GAP_MIN = 6;
+const GAP_MAX = 10;
 
 /**
- * Dev-only override of the pacing, for exercising triggers back to back.
+ * Live pacing, overridable by the dev hook below.
  *
- * The gap and the cap exist to keep the eyes from chattering at a visitor, and
- * they do that well: across ninety seconds of deliberately provoking every
- * trigger in turn, the gap alone blocked eleven attempts and only three lines
- * were heard. That is right for a visit and useless for testing, where the
- * question is whether a given trigger detects at all.
+ * `maxLines` is deliberately uncapped. There was a cap of five, on the reasoning
+ * that a talking mascot's failure mode is chattiness — but combined with the
+ * long gap it also meant the eyes fell permanently silent early in a visit,
+ * which reads as broken rather than restrained. What actually prevents chatter
+ * is the per-trigger cooldowns: each observation has its own, mostly 45-90s, so
+ * variety is forced across triggers and no single one can loop. The eyes now
+ * stay responsive for as long as someone is on the hero.
  *
- * `__dlg.fast()` shrinks the gap and lifts the cap without touching detection,
- * so what is observed is still the real trigger firing.
+ * `__dlg.fast()` shrinks the gap and the cooldowns for testing, without
+ * touching detection — what a test observes is still the real trigger firing.
  */
 let gapMin = GAP_MIN;
 let gapMax = GAP_MAX;
-let maxLines = 5;
+let maxLines = Infinity;
 /** Multiplier on every per-trigger cooldown; 1 in normal use. */
 let cooldownScale = 1;
-
-/*
- * How many lines before the eyes go quiet for good, held in `maxLines` above.
- *
- * The failure mode of a talking mascot is chattiness, and it arrives fast. Five
- * is enough for a visitor to notice the eyes are responsive without the bubble
- * becoming furniture. `backToTop` is exempt — see `request`.
- */
 
 /** Typing speed and hold, in seconds. */
 const TYPE_RATE = 0.028;
@@ -141,7 +152,7 @@ const TRACE_KEY = "dlg.trace";
 export function setFast(on: boolean) {
   gapMin = on ? 3 : GAP_MIN;
   gapMax = on ? 3.5 : GAP_MAX;
-  maxLines = on ? Infinity : 5;
+  maxLines = Infinity;
   cooldownScale = on ? 0.05 : 1;
   book.nextAt = 0;
   book.spoken = 0;
@@ -231,7 +242,7 @@ export function installDialogueHook() {
       console.log(
         on
           ? "%cdialogue FAST mode%c — ~3s between lines, no cap, persists across reloads. __dlg.off() to stop."
-          : "%cdialogue pacing restored%c — 20-30s gap, cap 5.",
+          : "%cdialogue pacing restored%c — 6-10s gap, full cooldowns.",
         "color:#2bb8d4;font-weight:bold",
         "color:#64748b",
       );
@@ -258,7 +269,7 @@ export function installDialogueHook() {
         /* storage unavailable */
       }
       console.log(
-        "%cdialogue back to normal%c — 20-30s gap, cap 5, no logging.",
+        "%cdialogue back to normal%c — 6-10s gap, full cooldowns, no logging.",
         "color:#2bb8d4;font-weight:bold",
         "color:#64748b",
       );
