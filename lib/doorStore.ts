@@ -1,6 +1,9 @@
 "use client";
 
 import { create } from "zustand";
+// Read to tell when the rewind has actually landed. The scroll store holds no
+// reference back here, so this direction introduces no cycle.
+import { scroll } from "./scrollStore";
 
 /**
  * Which door the viewer has gone through, if any.
@@ -42,20 +45,44 @@ export const useDoorStore = create<DoorStore>((set) => ({
      * that runs during state computation, where side effects do not belong.
      */
     if (typeof window !== "undefined") {
-      requestAnimationFrame(() => scrollToTimeline());
+      requestAnimationFrame(() => scrollToSection(id === "right" ? "#hall" : "#timeline"));
     }
   },
   exit: () => {
-    if (useDoorStore.getState().entered === null) return;
-    set({ entered: null });
+    const leaving = useDoorStore.getState().entered;
+    if (leaving === null) return;
+
+    if (typeof window === "undefined") {
+      set({ entered: null });
+      return;
+    }
+
     /*
-     * Return the page to the doors as well as the camera. The timeline's
-     * section collapses to nothing on exit and the reader is usually scrolled
-     * well inside it — left alone the browser clamps to the new bottom of the
-     * page, which is some way past the doors.
+     * Leaving is the entrance played backwards, and it has an order.
+     *
+     * Behind the left door the reader is somewhere along the thread, so the
+     * traverse is rewound to its start *first* and only then does the camera
+     * withdraw — otherwise it reverses out of the middle of the timeline,
+     * which reads as being yanked rather than stepping back through the
+     * doorway. The hall has no traverse, so it withdraws immediately.
+     *
+     * The page is restored to the doors last, after the flight has finished:
+     * the section collapses to nothing the moment it is no longer entered, and
+     * doing that while the camera is still inside pulls the scene out from
+     * under it. Until then `scroll.timeline` is pinned at 0 so the rewind
+     * cannot be undone by a stray scroll event mid-flight.
      */
-    if (typeof window !== "undefined") {
-      requestAnimationFrame(() => requestAnimationFrame(scrollBackToDoors));
+    const finish = () => {
+      set({ entered: null });
+      // FLIGHT_OUT is 0.85s; wait for it to unwind before collapsing the
+      // section, plus a small margin for the last frame to land.
+      window.setTimeout(scrollBackToDoors, 950);
+    };
+
+    if (leaving === "left") {
+      rewindTimeline(finish);
+    } else {
+      finish();
     }
   },
 }));
@@ -79,19 +106,19 @@ function lenis() {
 }
 
 /**
- * Scroll to the timeline once it has actually opened.
+ * Scroll to a section once it has actually opened.
  *
  * Polls rather than waiting a fixed number of frames: the section has no
  * height until React has re-rendered on the new state, and how many frames
  * that takes is not something to guess at — two was not enough, and any fixed
  * count would be a race. Bounded so a failure to open cannot spin forever.
  */
-function scrollToTimeline(attempt = 0) {
-  const el = document.querySelector("#timeline");
+function scrollToSection(selector: string, attempt = 0) {
+  const el = document.querySelector(selector);
   const h = el?.getBoundingClientRect().height ?? 0;
 
   if (h < 100) {
-    if (attempt < 30) requestAnimationFrame(() => scrollToTimeline(attempt + 1));
+    if (attempt < 30) requestAnimationFrame(() => scrollToSection(selector, attempt + 1));
     return;
   }
 
@@ -115,6 +142,40 @@ function scrollToTimeline(attempt = 0) {
   l?.resize?.();
   if (l) l.scrollTo(y, { immediate: true, force: true });
   else window.scrollTo(0, y);
+}
+
+/**
+ * Run the timeline traverse back to its start, then call `done`.
+ *
+ * Scrolled rather than jumped: the thread is read by scrolling, so unreading it
+ * the same way is what makes the exit feel like stepping back out rather than
+ * cutting. The camera follows because the rail is driven by `scroll.timeline`,
+ * which this is winding down.
+ *
+ * Bounded by a deadline as well as by arrival — Lenis eases asymptotically and
+ * would otherwise leave this waiting on a value that never quite reaches zero.
+ */
+function rewindTimeline(done: () => void) {
+  const el = document.querySelector("#timeline");
+  if (!el) {
+    done();
+    return;
+  }
+
+  const top = window.scrollY + el.getBoundingClientRect().top;
+  const l = lenis();
+  if (l) l.scrollTo(top, { duration: 0.7 });
+  else window.scrollTo({ top, behavior: "smooth" });
+
+  const deadline = performance.now() + 1100;
+  const settle = () => {
+    if (scroll.timeline <= 0.01 || performance.now() > deadline) {
+      done();
+      return;
+    }
+    requestAnimationFrame(settle);
+  };
+  requestAnimationFrame(settle);
 }
 
 function scrollBackToDoors() {

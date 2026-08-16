@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { scroll } from "@/lib/scrollStore";
 import { useTimelineStore } from "@/lib/timelineStore";
+import { useDoorStore } from "@/lib/doorStore";
 import { Timeline } from "./Timeline";
 
 /**
@@ -18,6 +19,7 @@ export function TimelineScene() {
   const progress = useRef(0);
   const visible = useRef(0);
   const setHovered = useTimelineStore((s) => s.setHovered);
+  const entered = useDoorStore((s) => s.entered);
 
   useFrame(() => {
     const t = THREE.MathUtils.clamp(scroll.timeline, 0, 1);
@@ -42,7 +44,48 @@ export function TimelineScene() {
     const byScroll =
       THREE.MathUtils.smoothstep(t, 0.0, 0.04) *
       (1 - THREE.MathUtils.smoothstep(t, 0.97, 1.0));
-    visible.current = Math.max(byScroll, THREE.MathUtils.smoothstep(scroll.doorFlight, 0.5, 1));
+    /*
+     * Only the left door leads here. Keying on flight progress alone drew the
+     * thread inside the projects hall as well, since both doors share the same
+     * flight value — the timeline's labels bled straight through the chips.
+     */
+    /*
+     * Keyed on the flight's own door, so the thread survives the way out.
+     *
+     * `entered` clears on the Back click while the flight still has most of a
+     * second to run; keyed to it, the timeline vanished before the camera had
+     * begun to withdraw. `doorSide` holds until the flight has unwound.
+     *
+     * Asymmetric on purpose: 0.5..1 arriving, 0.05..0.85 leaving.
+     *
+     * Arriving, the thread must not be up before the camera is through the
+     * doorway, which needs a window high in the range. Leaving, doorFlight
+     * unwinds toward zero over 0.85s, and that same high window is spent in
+     * the first fraction of it — measured, the thread was on screen for only
+     * 0.23s of the retreat and the rest played over an empty grid. Fading
+     * across almost the whole range keeps it drawn for the withdrawal.
+     */
+    const side = scroll.doorSide;
+    const outbound = entered === null;
+    const byFlight =
+      side === "left"
+        ? THREE.MathUtils.smoothstep(scroll.doorFlight, outbound ? 0.05 : 0.5, outbound ? 0.85 : 1)
+        : 0;
+    /*
+     * While leaving, the flight alone decides how visible the thread is.
+     *
+     * The scroll term is dropped because the page is still parked inside the
+     * timeline's section as the camera withdraws, so it would hold the thread
+     * at full strength for the whole retreat and then cut. The flight is the
+     * thing actually moving, so it is the thing that should govern the fade.
+     *
+     * `byFlight` alone is enough here precisely because doorFlight is pinned
+     * at 1 until the rewind completes — the thread stays fully drawn through
+     * the scroll back to the start, then fades as the camera pulls out.
+     */
+    const leaving = entered === null && side === "left";
+    visible.current =
+      side === "right" ? 0 : leaving ? byFlight : Math.max(byScroll, byFlight);
 
     if (process.env.NODE_ENV !== "production") {
       // Test hook: the thread is invisible in a screenshot when anything in

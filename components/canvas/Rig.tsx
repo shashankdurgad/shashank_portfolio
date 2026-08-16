@@ -8,6 +8,7 @@ import { timelineCurve } from "@/lib/timelineCurve";
 import { TIMELINE_ORIGIN as ORIGIN } from "./Timeline";
 import { useDoorStore } from "@/lib/doorStore";
 import { DOOR_CENTRE, hingeX } from "@/lib/doors";
+import { HALL_CENTRE, LOOK } from "@/lib/hallLayout";
 
 const tmpPos = new THREE.Vector3();
 const curvePos = new THREE.Vector3();
@@ -41,6 +42,30 @@ const THROUGH_Z = -3.2;
 
 const flightPos = new THREE.Vector3();
 const flightTarget = new THREE.Vector3();
+const hallLook = new THREE.Vector3();
+
+/** Eased head-turn, kept between frames so it damps rather than snapping. */
+const look = { yaw: 0, pitch: 0 };
+
+/**
+ * Cursor in normalised device coordinates, tracked from the window.
+ *
+ * R3F's own `state.pointer` is unusable here: the canvas is
+ * pointer-events:none so the page above stays clickable, which means pointer
+ * events land on the HTML sections and R3F never updates its value — it stays
+ * pinned wherever it happened to start, and the camera with it.
+ */
+const hallPointer = { x: 0, y: 0 };
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      hallPointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      hallPointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    },
+    { passive: true },
+  );
+}
 
 /**
  * Camera: static for the hero and morph, travelling for the timeline.
@@ -69,6 +94,21 @@ export function Rig({ pointer = true }: { pointer?: boolean }) {
       1,
     );
 
+    /*
+     * Remember which doorway the flight belongs to for as long as it is
+     * running, including all the way back out.
+     *
+     * `entered` clears on the click, so anything keyed to it alone disappears
+     * before the camera has moved. This holds until the flight has fully
+     * unwound, which is what lets the destination stay in view during the
+     * zoom out.
+     */
+    if (entered) scroll.doorSide = entered;
+    else if (scroll.doorFlight <= 0.001) scroll.doorSide = null;
+
+    /** The door in play: the one entered, or the one being left. */
+    const side = scroll.doorSide;
+
     const raw = THREE.MathUtils.clamp(scroll.timeline, 0, 1);
     const t = T_START + raw * (T_END - T_START);
 
@@ -82,7 +122,8 @@ export function Rig({ pointer = true }: { pointer?: boolean }) {
      * flight progress rather than replacing means the handover in either
      * direction is continuous.
      */
-    const onRail = entered ? THREE.MathUtils.smoothstep(scroll.doorFlight, 0.45, 1) : 0;
+    const onRail =
+      side === "left" ? THREE.MathUtils.smoothstep(scroll.doorFlight, 0.45, 1) : 0;
 
     tmpPos.copy(CAMERA_POSITION);
     target.copy(CAMERA_TARGET);
@@ -116,20 +157,28 @@ export function Rig({ pointer = true }: { pointer?: boolean }) {
      */
     if (scroll.doorFlight > 0.001 && onRail < 1) {
       const f = THREE.MathUtils.smoothstep(scroll.doorFlight, 0, 1);
-      const side = entered === "left" ? -1 : 1;
+      const sign = side === "left" ? -1 : 1;
       // Aim at the middle of the chosen panel, not the pair's centre.
-      const doorX = (hingeX(side) - side * 0.575) * 1.15;
+      const doorX = (hingeX(sign) - sign * 0.575) * 1.15;
 
       /*
-       * The flight ends exactly where the scroll traverse begins, so the
-       * handover is invisible: the flight becomes the first step of the walk.
+       * The flight ends exactly where the destination's own camera begins, so
+       * the handover is invisible — through the left door that is the first
+       * step of the timeline walk, through the right it is the spot the viewer
+       * stands on in the hall.
        */
-      timelineCurve.getPoint(T_START, lookAhead);
-      lookAhead.add(TIMELINE_ORIGIN);
-      timelineCurve.getPoint(Math.max(0, T_START - TRAIL), curvePos);
-      curvePos.add(TIMELINE_ORIGIN);
-      curvePos.y += LIFT;
-      curvePos.z += 3.4;
+      if (side === "right") {
+        // The hall's viewer stands at its centre, looking straight ahead.
+        curvePos.copy(HALL_CENTRE);
+        lookAhead.set(HALL_CENTRE.x, HALL_CENTRE.y, HALL_CENTRE.z - 4);
+      } else {
+        timelineCurve.getPoint(T_START, lookAhead);
+        lookAhead.add(TIMELINE_ORIGIN);
+        timelineCurve.getPoint(Math.max(0, T_START - TRAIL), curvePos);
+        curvePos.add(TIMELINE_ORIGIN);
+        curvePos.y += LIFT;
+        curvePos.z += 3.4;
+      }
 
       // First half is the approach through the doorway; second half arrives.
       const approach = THREE.MathUtils.smoothstep(f, 0, 0.55);
@@ -143,10 +192,39 @@ export function Rig({ pointer = true }: { pointer?: boolean }) {
       target.lerp(flightTarget, f);
     }
 
+    /*
+     * Inside the right-hand door the camera stands still and turns, as if the
+     * viewer were looking around a room. Chips sit on an arc about this point,
+     * so turning is what reveals them — a dolly would just approach one.
+     */
+    const inHall = side === "right" ? THREE.MathUtils.smoothstep(scroll.doorFlight, 0.45, 1) : 0;
+    if (inHall > 0) {
+      /*
+       * Positive, not negated: moving the cursor left must turn the view left.
+       * A yaw of +x rotates the look-at point toward +x, which is the
+       * direction the cursor is already heading.
+       */
+      const targetYaw = hallPointer.x * LOOK.yaw;
+      const targetPitch = hallPointer.y * LOOK.pitch;
+      const k = Math.min(1, dt * LOOK.rate);
+      look.yaw += (targetYaw - look.yaw) * k;
+      look.pitch += (targetPitch - look.pitch) * k;
+
+      hallLook.set(
+        HALL_CENTRE.x + Math.sin(look.yaw) * 4,
+        HALL_CENTRE.y + Math.sin(look.pitch) * 4,
+        HALL_CENTRE.z - Math.cos(look.yaw) * 4,
+      );
+
+      tmpPos.lerp(HALL_CENTRE, inHall);
+      target.lerp(hallLook, inHall);
+    }
+
     // Subtle parallax from the cursor. Damped while travelling: the same
     // offset that reads as life on a static shot becomes a wobble in motion.
+    // Off entirely in the hall, where the head-turn is the camera motion.
     if (pointer) {
-      const par = (1 - onRail * 0.75) * (1 - scroll.doorFlight);
+      const par = (1 - onRail * 0.75) * (1 - scroll.doorFlight) * (1 - inHall);
       tmpPos.x += state.pointer.x * 0.35 * par;
       tmpPos.y += state.pointer.y * 0.2 * par;
     }

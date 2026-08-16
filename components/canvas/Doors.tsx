@@ -95,7 +95,17 @@ function Door({
      * through the viewer, and they would watch it close from inside the
      * doorway rather than see it close behind them.
      */
-    const flownOut = !entered && scroll.doorFlight < 0.35;
+    /*
+     * 0.12, below where either destination has finished fading.
+     *
+     * At 0.35 the panel began swinging shut while the scene behind it was
+     * still fully drawn — the hall does not start fading until 0.4 — so the
+     * door closed in front of the chips and the viewer watched a shut door
+     * rather than a room receding through a doorway. Closing last, once the
+     * room behind is already gone, is what makes the exit read as withdrawing
+     * through the opening.
+     */
+    const flownOut = !entered && scroll.doorFlight < 0.12;
     const held = opened && !flownOut;
 
     const target = held
