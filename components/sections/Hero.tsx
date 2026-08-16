@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useQuality } from "@/lib/quality";
+import { bindSignals, raise } from "@/lib/dialogueSignals";
+import { book, installDialogueHook, request } from "@/lib/dialogueStore";
+import { EyeDialogue } from "@/components/ui/EyeDialogue";
 
 /**
  * Hero copy, inlined. Previously imported from content/resume.ts, which was
@@ -83,6 +86,47 @@ export function Hero() {
 
   const show = booted || expired ? "visible" : "hidden";
 
+  /*
+   * The eyes' voice.
+   *
+   * The window-level detectors bind here rather than in the canvas so they
+   * exist even on the tiers where the scene never mounts — the bubble is DOM
+   * and can still greet a visitor whose GPU cannot draw the eyes. The
+   * frame-driven triggers do come from the canvas, and simply never fire when
+   * there is no canvas to run them.
+   */
+  useEffect(() => {
+    book.instant = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    installDialogueHook();
+    return bindSignals();
+  }, []);
+
+  /*
+   * The greeting waits for the overlay to finish lifting, not merely for
+   * `booted`.
+   *
+   * `booted` only starts the fade — keyed off that, the whole greeting typed
+   * out and expired behind the loader, measured at 4.5s against an overlay
+   * that did not leave until 9s. `uncovered` is the moment the hero is
+   * genuinely on screen.
+   *
+   * The delay on top is deliberate: arriving in the same instant as the hero
+   * copy reads as part of the page load, where the line should land as
+   * someone noticing you.
+   *
+   * `uncovered` alone, with no `expired` fallback. That fallback exists so the
+   * hero copy is never trapped behind a stalled loader, but it fires on a 3s
+   * timer that can easily beat the overlay — which is exactly how the greeting
+   * ended up speaking into a covered screen. A greeting nobody sees is worse
+   * than one that waits, and the loader has its own 8s escape hatch.
+   */
+  const uncovered = useQuality((s) => s.uncovered);
+  useEffect(() => {
+    if (!uncovered) return;
+    const t = setTimeout(() => request("greeting"), 900);
+    return () => clearTimeout(t);
+  }, [uncovered]);
+
   return (
     <section
       id="hero"
@@ -117,8 +161,18 @@ export function Hero() {
         </motion.p>
       </div>
 
-      {/* Middle row is deliberately empty — the eyes own the centre. */}
-      <div aria-hidden="true" />
+      {/*
+        Middle row is otherwise empty — the eyes own the centre, and what they
+        say sits at the foot of it, directly under them.
+
+        This replaced a static "scroll" prompt. The two wanted the same slot
+        and said the same thing, and the eyes nudging you downward when you
+        have stalled is both the same instruction and a better one: it arrives
+        because you paused, not because the page loaded.
+      */}
+      <div className="flex items-end justify-center pb-4">
+        <EyeDialogue />
+      </div>
 
       {/* ── Bottom-right: blurb and links ─────────────────────────────── */}
       <div className="flex justify-start lg:justify-end">
@@ -146,6 +200,10 @@ export function Hero() {
                 className="bp-chip"
                 style={{ ["--chip" as string]: glow }}
                 href={href}
+                // The eyes notice you considering a contact link. Raised rather
+                // than requested directly, so it queues with everything else
+                // and loses to a livelier trigger in the same frame.
+                onPointerEnter={() => raise("contactHover")}
                 // mailto: must stay in the current tab; a new tab would open
                 // and immediately blank when the mail client takes over.
                 {...(href.startsWith("mailto:")

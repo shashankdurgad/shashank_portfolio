@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useDoorStore } from "@/lib/doorStore";
 import { scroll } from "@/lib/scrollStore";
+import { usePromptOnce } from "@/lib/usePromptOnce";
 import { TIMELINE } from "@/lib/timelineData";
 
 /**
@@ -25,21 +25,12 @@ export function TimelineStage() {
   const entered = useDoorStore((s) => s.entered);
   const open = entered === "left";
   /*
-   * Whether the traverse has begun, so the prompt can retire once it has done
-   * its job. Polled on scroll rather than held in the scroll store: this is
-   * the only consumer, and the store is deliberately outside React so that
-   * per-frame values never trigger renders.
+   * Shown the first time the timeline is entered and never again. Clearing it
+   * on exit meant it returned on every re-entry, and deriving it from the
+   * current scroll position meant it returned whenever the reader went back to
+   * the start of the thread.
    */
-  const [started, setStarted] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const onScroll = () => setStarted(scroll.timeline > 0.02);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      setStarted(false);
-    };
-  }, [open]);
+  const showPrompt = usePromptOnce(open, () => scroll.timeline > 0.02);
 
   return (
     <section
@@ -87,13 +78,10 @@ export function TimelineStage() {
           ))}
         </ol>
 
-        {/*
-          Kept, but only until the reader has begun: once they are moving along
-          the thread the prompt has served its purpose.
-        */}
+        {/* Retires for good once the reader has begun moving along the thread. */}
         <p
           className={`text-center font-mono text-[11px] uppercase tracking-[0.22em] text-ink-dim/70 transition-opacity duration-500 ${
-            started ? "opacity-0" : "opacity-100"
+            showPrompt ? "opacity-100" : "opacity-0"
           }`}
         >
           scroll

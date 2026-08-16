@@ -25,6 +25,7 @@ export function BootLoader() {
   const progress = useQuality((s) => s.progress);
   const booted = useQuality((s) => s.booted);
   const setBooted = useQuality((s) => s.setBooted);
+  const setUncovered = useQuality((s) => s.setUncovered);
 
   /**
    * The displayed value is driven on a floor that climbs on its own, not
@@ -74,7 +75,12 @@ export function BootLoader() {
   const visible = ready && tier !== "off" && !booted;
 
   return (
-    <AnimatePresence>
+    /*
+     * onExitComplete is the moment the hero is genuinely on screen, which is
+     * later than `booted` by the length of the fade. Anything timed to be read
+     * by a visitor keys off this.
+     */
+    <AnimatePresence onExitComplete={setUncovered}>
       {visible && (
         <motion.div
           key="boot"

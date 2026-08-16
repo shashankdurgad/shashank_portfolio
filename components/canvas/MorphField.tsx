@@ -5,13 +5,16 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { ProceduralEyeSource } from "@/lib/eyeGeometry";
 import { eyePositions } from "@/lib/eyeTargets";
-import { createBlink, createGaze, stepBlink, stepGaze } from "@/lib/gaze";
+import { GAZE_LIMIT, createBlink, createGaze, stepBlink, stepGaze } from "@/lib/gaze";
 import { haloPositions } from "@/lib/haloTargets";
 import { timelinePositions } from "@/lib/timelineCurve";
 import { TIMELINE_ORIGIN } from "./Timeline";
 import { Doors } from "./Doors";
 import { PARTICLES, rng, scatterDirections } from "@/lib/morphTargets";
 import { scroll } from "@/lib/scrollStore";
+import { useDoorStore } from "@/lib/doorStore";
+import { best, request, silence, step as stepDialogue } from "@/lib/dialogueStore";
+import { detect, signals } from "@/lib/dialogueSignals";
 import { morphFragment, morphVertex } from "./morph.glsl";
 
 /**
@@ -122,10 +125,32 @@ export function MorphField({
    * listener is both simpler and more correct than routing through hit-testing.
    */
   const ndc = useRef({ x: 0, y: 0, seen: false });
+  /** True once the cursor plane has actually been hit at least once. */
+  const cursorSolved = useRef(false);
   useEffect(() => {
+    let lastAt = performance.now();
     const onMove = (e: PointerEvent) => {
-      ndc.current.x = (e.clientX / window.innerWidth) * 2 - 1;
-      ndc.current.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      const x = (e.clientX / window.innerWidth) * 2 - 1;
+      const y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      /*
+       * Mirror the pointer into the dialogue's signals while it is here.
+       *
+       * Speed is measured on the event rather than per frame: two moves inside
+       * one frame would otherwise read as one slow move, which is exactly
+       * backwards for the triggers that care about haste.
+       */
+      const now = performance.now();
+      const dt = Math.max(1, now - lastAt) / 1000;
+      lastAt = now;
+      signals.speed = Math.hypot(x - ndc.current.x, y - ndc.current.y) / dt;
+      signals.x = x;
+      signals.y = y;
+      signals.still = 0;
+      signals.seen = true;
+
+      ndc.current.x = x;
+      ndc.current.y = y;
       ndc.current.seen = true;
     };
     window.addEventListener("pointermove", onMove, { passive: true });
@@ -162,6 +187,13 @@ export function MorphField({
 
   /** 0 until the doors are on screen; gates their interactivity. */
   const doorsVisible = useRef(0);
+
+  /*
+   * Which door was entered. R3F re-registers the frame callback on every
+   * render, so the closure always sees the current value — no ref needed, and
+   * writing one during render is not allowed anyway.
+   */
+  const entered = useDoorStore((s) => s.entered);
 
   const scatter = useMemo(() => scatterDirections(count), [count]);
   const seeds = useMemo(() => {
@@ -236,11 +268,27 @@ export function MorphField({
      * the camera then flew through the doors at point-blank range once the
      * timeline began, smearing the panels and their labels across the frame.
      */
-    const leaving = THREE.MathUtils.smoothstep(scroll.timeline, 0.0, 0.05);
+    const leaving =
+      THREE.MathUtils.smoothstep(scroll.timeline, 0.0, 0.05) *
+      /*
+       * Suppressed until the flight is through the doorway.
+       *
+       * Entering scrolls the page to the destination section, which drives
+       * scroll.timeline up immediately — so this fired on the click itself and
+       * the doors blinked out before the camera had moved. The flight then had
+       * nothing to fly through. Holding it back until the crossing is done
+       * leaves the door-plane fade below in sole charge of the transit.
+       */
+      THREE.MathUtils.smoothstep(scroll.doorFlight, 0.5, 0.85);
 
     // The halo gathers into the thread as the flight carries the camera
     // through, so the doorway's atmosphere becomes the line beyond it.
-    u.uThreadMix.value = scroll.doorFlight;
+    /*
+     * Only the left door's halo becomes the timeline thread. Keying on flight
+     * progress alone drew the thread inside the projects hall too, since both
+     * doors share the same flight value.
+     */
+    u.uThreadMix.value = entered === "left" ? scroll.doorFlight : 0;
     u.uTreeMix.value = THREE.MathUtils.smoothstep(p, 1.6, 1.95);
     // Depth-fading only applies while the eyes are a coherent surface. Held
     // until the lids have shut, so the closed pose keeps its silhouette.
@@ -272,9 +320,16 @@ export function MorphField({
     doorsVisible.current =
       THREE.MathUtils.smoothstep(p, 1.6, 1.95) *
       (1 - leaving) *
-      // Fade as the camera passes the door plane, so the panels do not hang
-      // in frame behind the viewer once they are through.
-      (1 - THREE.MathUtils.smoothstep(scroll.doorFlight, 0.45, 0.9));
+      /*
+       * Fade across the moment the camera crosses the door plane.
+       *
+       * The flight reaches that plane at roughly t=0.38 and is well past it by
+       * 0.5. Fading over 0.45..0.9 therefore held the panels solid while the
+       * viewer went through them and only dissolved them afterwards, so the
+       * doors appeared to vanish rather than be flown through. Fading as they
+       * pass the camera lets them sweep out of frame the way a doorway does.
+       */
+      (1 - THREE.MathUtils.smoothstep(scroll.doorFlight, 0.3, 0.52));
 
     /*
      * Ease the hover grow rather than snapping it, which would pop. Faster in
@@ -308,6 +363,9 @@ export function MorphField({
       if (ndc.current.seen && state.raycaster.ray.intersectPlane(cursorPlane, hitPoint)) {
         localCursor.copy(hitPoint).sub(group.current.position).divideScalar(fieldScale);
         u.uCursor.value.lerp(localCursor, Math.min(1, delta * 9));
+        // Only true once localCursor holds a real intersection; the dialogue's
+        // proximity signal reads it, and before this it is still at the origin.
+        cursorSolved.current = true;
 
         /*
          * Aim each eye at the cursor from its own socket, so both eyes
@@ -342,6 +400,36 @@ export function MorphField({
 
       u.uGazeL.value.set(gazeL.current.yaw, gazeL.current.pitch);
       u.uGazeR.value.set(gazeR.current.yaw, gazeR.current.pitch);
+
+      /*
+       * Feed the dialogue from what the gaze system already knows.
+       *
+       * Everything here is a read of state computed above, so noticing costs a
+       * few comparisons rather than any tracking of its own. The eye distance
+       * is measured in the field's local units, which is what `localCursor`
+       * and `eyes.separation` are both already in.
+       */
+      signals.still += delta;
+      signals.speed *= Math.max(0, 1 - delta * 6);
+      signals.gaze =
+        Math.max(Math.abs(gazeL.current.yaw), Math.abs(gazeR.current.yaw)) / GAZE_LIMIT;
+      signals.blink = blink.current.value;
+      signals.toEyes = cursorSolved.current
+        ? Math.hypot(localCursor.x, localCursor.y)
+        : Infinity;
+
+      /*
+       * Once the reader has left the hero the eyes are shut and the field is
+       * mid-burst, so there is no longer a speaker on screen. The latch is
+       * permanent — `backToTop` is the single exception, and it opts out
+       * inside the store rather than here.
+       */
+      if (scroll.morph > 0.05) silence();
+
+      stepDialogue(delta);
+      const fired = detect(delta, scroll.morph, scroll.morph < 0.02);
+      const winner = best(fired);
+      if (winner) request(winner);
     }
     if (process.env.NODE_ENV !== "production" && group.current) {
       // Test hook: lets a browser assert the field is genuinely static and
@@ -360,6 +448,8 @@ export function MorphField({
         cursor: [+localCursor.x.toFixed(3), +localCursor.y.toFixed(3)],
         morph: +p.toFixed(4),
         doors: +doorsVisible.current.toFixed(4),
+        doorFlight: +scroll.doorFlight.toFixed(4),
+        doorSide: scroll.doorSide,
         doorAngle: +(
           (window as unknown as { __doorAngle?: number }).__doorAngle ?? 0
         ).toFixed(4),

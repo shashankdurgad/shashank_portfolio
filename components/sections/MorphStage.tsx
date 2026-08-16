@@ -24,7 +24,6 @@ export function MorphStage() {
             bursts apart, then the fragments settle around a pair of doors. The
             left door leads to experience and education, the right to projects.
           </span>
-          <span aria-hidden="true">scroll</span>
         </p>
       </div>
     </section>

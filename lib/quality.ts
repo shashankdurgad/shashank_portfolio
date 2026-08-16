@@ -40,9 +40,20 @@ type QualityStore = {
   progress: number;
   /** true once the scene has loaded and the boot overlay has been dismissed */
   booted: boolean;
+  /**
+   * true once the overlay has finished fading out and the hero is actually
+   * visible.
+   *
+   * Distinct from `booted`, which only starts the exit animation — anything
+   * that needs the reader to *see* it must wait for this instead. The eyes'
+   * greeting keyed off `booted` at first and played out entirely behind the
+   * overlay.
+   */
+  uncovered: boolean;
   init: () => void;
   setProgress: (progress: number) => void;
   setBooted: () => void;
+  setUncovered: () => void;
 };
 
 export const useQuality = create<QualityStore>((set) => ({
@@ -51,14 +62,17 @@ export const useQuality = create<QualityStore>((set) => ({
   ready: false,
   progress: 0,
   booted: false,
+  uncovered: false,
   init: () => {
     const tier = detectTier();
     // With no canvas there is nothing to wait for — never gate these users
     // behind a loader that has no progress to report.
-    set({ tier, ready: true, booted: tier === "off" });
+    const off = tier === "off";
+    set({ tier, ready: true, booted: off, uncovered: off });
   },
   setProgress: (progress) => set({ progress }),
   setBooted: () => set({ booted: true }),
+  setUncovered: () => set({ uncovered: true }),
 }));
 
 /** Per-tier scene budgets, read by scene components. */
