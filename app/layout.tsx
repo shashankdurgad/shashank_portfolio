@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { PROFILE } from "@/content/profile";
+import { THEME_INIT } from "@/components/ThemeToggle";
 import "./globals.css";
 
 const inter = Inter({
@@ -8,25 +10,14 @@ const inter = Inter({
   display: "swap",
 });
 
-/**
- * Site identity, inlined. Previously imported from content/resume.ts; that
- * module was removed with the resume sections, and metadata must not depend
- * on content modules that come and go with the UX.
- */
-const SITE = {
-  name: "Shashank Durgad",
-  tagline: "agentic AI systems and the infra that make them measurably better",
-  blurb:
-    "CS at UCL, SWE intern at Overmind. I build agentic systems and the measurement layer around them — traces, evals, and the pipelines that turn both into better models.",
-  github: "https://github.com/shashankdurgad",
-};
+const title = `${PROFILE.name} — ${PROFILE.tagline}`;
 
 export const metadata: Metadata = {
-  title: `${SITE.name} — ${SITE.tagline}`,
-  description: SITE.blurb,
-  authors: [{ name: SITE.name, url: SITE.github }],
+  title,
+  description: PROFILE.blurb,
+  authors: [{ name: PROFILE.name, url: PROFILE.github }],
   keywords: [
-    "Shashank Durgad",
+    PROFILE.name,
     "agentic AI",
     "reinforcement learning",
     "model training",
@@ -35,27 +26,34 @@ export const metadata: Metadata = {
     "software engineer",
   ],
   openGraph: {
-    title: `${SITE.name} — ${SITE.tagline}`,
-    description: SITE.blurb,
+    title,
+    description: PROFILE.blurb,
     type: "profile",
     locale: "en_GB",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${SITE.name} — ${SITE.tagline}`,
-    description: SITE.blurb,
+    title,
+    description: PROFILE.blurb,
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#05070a",
-  colorScheme: "dark",
+  // Both, so the browser chrome follows whichever theme is showing.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fbfbf9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0b" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased`}>
-      <body className="bg-void text-ink">{children}</body>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        {/* Must run before first paint — see the note on THEME_INIT. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }

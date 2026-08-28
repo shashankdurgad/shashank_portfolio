@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // v1 is a frozen archive — not linted.
+    "v1/**",
   ]),
 ]);
 

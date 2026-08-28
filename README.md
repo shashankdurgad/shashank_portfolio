@@ -1,103 +1,98 @@
-# shashank.dev — The Garage Bay
+# shashank_portfolio
 
-Personal portfolio. A single fixed WebGL scene — an engineering bay with a
-telemetry wall and a Lorenz attractor at its centre — sits behind
-server-rendered HTML.
-The camera dollies through the bay as you scroll.
+## v2 (active)
 
-The metaphor is deliberately broad: an F1 pit wall and a Stark workshop are the
-same room, an engineer instrumenting a machine and reading telemetry off it.
-That covers agentic systems, RL, model training and data pipelines equally,
-because all four are the same loop — instrument, measure, tune, repeat.
-
-## Stack
-
-Next 16 (App Router) · React 19 · TypeScript · Tailwind v4 · three / R3F / drei ·
-GSAP ScrollTrigger · Motion · Lenis · Zustand
+The live project lives at the repo root. Next.js 16, React 19, Tailwind 4.
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm run build
+npm run dev
 ```
 
-## Adding a project
+### The portrait
 
-Append one object to [`content/projects.ts`](content/projects.ts). Nothing else
-needs editing — the card, its 3D wall readout, its camera stop and the page's
-scroll length are all derived from this array.
+The hero portrait is line art generated from a photograph, and the lines push
+away from the cursor.
 
-```ts
-{
-  id: "my-project",
-  title: "My Project",
-  subtitle: "what it does",
-  period: "Jan 2027",
-  award: "optional",
-  blurb: "One or two sentences.",
-  bullets: ["Detail.", "Detail."],
-  tags: ["Python", "PyTorch"],
-  links: { repo: "...", paper: "..." },
-  readout: { kind: "waveform", accent: "cyan", density: 0.8 },
-}
+Geometry is generated **offline** — it is not computed in the browser. There are
+two styles, and they are genuinely different techniques rather than presets:
+
+```bash
+# amplitude-modulated scanlines — evenly spaced horizontal lines whose zigzag
+# amplitude carries the tone. Currently active.
+python3 scripts/portrait/waves.py
+
+# flowline hatching — lines follow tone contours, tone carried by line density.
+python3 scripts/portrait/trace.py
+
+# either script, preview only:
+python3 scripts/portrait/waves.py --preview-only
 ```
 
-`readout.kind` picks a 3D preset from the registry in
-[`components/canvas/readouts/`](components/canvas/readouts/):
+Both write to `app/_portrait/portrait.json` (committed), so **whichever ran last
+is what the site shows**. Both read `scripts/portrait/source.jpg` and emit the
+same format, and the renderer adapts to either — it measures the line spacing of
+whatever it loads and scales the repel displacement to match, because the two
+styles differ in density by roughly a factor of four.
 
-| kind | reads as |
-|---|---|
-| `waveform` | a live signal trace |
-| `lattice` | node graph / swarm |
-| `orbit` | orbital or cyclic system |
-| `flow` | pipeline, funnel, directed flow |
-| `bars` | throughput / histogram |
-| `scatter` | dataset, embedding cloud |
+Previews (`preview.png`, `preview-waves.png`) are gitignored; they exist for
+tuning by eye.
 
-If a preset isn't enough, pass a component instead — it renders through the same
-path and receives the same `ReadoutProps`:
+Needs only PIL and numpy. Every tunable sits at the top of its script with a note
+on what it trades off — several carry measurements taken against this specific
+photo, so read the comment before changing one.
+[Portrait.tsx](components/portrait/Portrait.tsx) renders the result to a canvas
+and runs the repel physics.
 
-```ts
-readout: { kind: "custom", component: MyScene }
+**Two geometries ship, one per theme.** Line art drawn for paper puts ink where
+the photo is *dark*. Rendered light-on-dark that mapping inverts — the hair
+becomes the brightest thing on the face and the portrait reads as an X-ray. So
+strokes have to follow lightness on a dark ground and darkness on a light one,
+and no single geometry is right in both.
+
+`waves.py` emits `portrait-dark.json` and `portrait-light.json` in one run (see
+`VARIANTS`), and [Portrait.tsx](components/portrait/Portrait.tsx) swaps between
+them on theme change. Both share line topology and vertex count, so the swap
+copies new rest positions into the existing buffers and the spring eases into
+them — nothing re-allocates and a mid-hover toggle stays smooth. Costs ~74KB
+gzipped for the pair rather than ~36KB for one.
+
+**Known limitation**: `waves.py` leaves a visible edge down the side of each ear,
+where the flat lines of the hair meet the tall waves of the lit ear. It is
+inherent to straight horizontal scanlines crossing a near-vertical tonal
+boundary, not a bug in the tone field. The header comment in that file records
+the five fixes that were measured and why each was rejected — read it before
+attempting a sixth. `trace.py` does not have the problem at all, because its
+lines follow the form and wrap around the ear rather than crossing it.
+
+### The hero grid
+
+[CursorGrid.tsx](components/CursorGrid.tsx) draws a grid behind the hero that is
+invisible at rest. Lines appear only within a radius of the pointer, and that
+radius tracks pointer *speed* — a fast sweep opens a wide pool, a slow drift
+barely disturbs it. Stop moving and it closes completely.
+
+Canvas rather than a CSS mask over a background image: the radius changes every
+frame, and animating that through style recalcs would thrash layout. It strokes
+in `currentColor`, so one implementation covers both themes, and it parks its
+rAF loop once the pool has closed. Disabled entirely under
+`prefers-reduced-motion`, and ignored for touch pointers, which have no hover to
+reveal it with.
+
+Note the canvas sits at `z-0`, not a negative index: the page background lives on
+`<html>`, and a negative index puts the canvas behind that and paints it out.
+
+## v1 (archived)
+
+The previous site — a scroll-driven three.js/R3F experience — is frozen in [v1/](v1/)
+for reference. It is excluded from the root TypeScript project and ESLint config, and
+its dependencies are not installed at the root.
+
+To run it, install and build inside that folder:
+
+```bash
+cd v1 && npm install && npm run dev
 ```
 
-Roles and skills work the same way via [`content/resume.ts`](content/resume.ts).
-
-## Architecture notes
-
-- **One canvas, mounted once** ([`SceneCanvas.tsx`](components/canvas/SceneCanvas.tsx)),
-  fixed behind the page with `pointer-events: none`. Never remounted per section.
-- **Text is real HTML**, not 3D meshes — so it's selectable, indexable and
-  readable by screen readers. Verify with
-  `curl -s localhost:3000 | grep -i overmind`.
-- **Scroll never touches React state.** ScrollTrigger writes to a mutable object
-  ([`lib/scrollStore.ts`](lib/scrollStore.ts)) that `useFrame` reads, keeping the
-  per-frame path free of re-renders.
-- **The centrepiece is a Lorenz attractor**
-  ([`Lorenz.tsx`](components/canvas/Lorenz.tsx)) — integrated with RK4 once at
-  mount, drawn as a faint full trajectory with a bright head tracing the path.
-  It rides the camera curve so it stays framed down the whole bay. Per-frame
-  updates write into the existing position buffer; `setFromPoints` would be
-  rejected every frame, since drei's `<Line>` sizes its buffers once.
-- **The camera path is generated**, not hand-tuned
-  ([`lib/constants.ts`](lib/constants.ts)) — which is what makes adding a project
-  free.
-- **Quality tiers** ([`lib/quality.ts`](lib/quality.ts)): `high` / `low` /
-  `off`. Under `prefers-reduced-motion` or without WebGL the canvas never mounts
-  and a static schematic grid renders instead.
-- **Boot sequence** ([`BootLoader.tsx`](components/ui/BootLoader.tsx)) covers
-  scene load with a schematic self-test, then lifts and hands off to the hero.
-  Progress crosses the R3F boundary via
-  [`ProgressBridge`](components/canvas/ProgressBridge.tsx), since `useProgress`
-  only works inside the Canvas. It is skipped entirely on the `off` tier — there
-  is nothing to wait for — and has both a minimum display time (so a fast load
-  doesn't flash) and a hard timeout (so a stalled one can't trap the page).
-
-## Verified
-
-Build, typecheck and lint clean; no console errors. Reduced-motion drops the
-canvas with all copy intact and never shows the loader; 390px viewport has no
-horizontal overflow and engages the low tier; 120fps scrolling under software
-GL. The boot sequence plays its checks, lifts on its own, and hands off to a
-fully-opaque hero. Adding a fourth project touches exactly one file and
-lengthens the camera path automatically.
+Its own notes are in [v1/README.md](v1/README.md), [v1/CONTENT.md](v1/CONTENT.md),
+and [v1/CONTRIBUTING-AGENTS.md](v1/CONTRIBUTING-AGENTS.md).

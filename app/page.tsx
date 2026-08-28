@@ -1,41 +1,55 @@
-import { SceneRoot } from "@/components/canvas/SceneRoot";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/sections/Hero";
-import { MorphStage } from "@/components/sections/MorphStage";
-import { TimelineStage } from "@/components/sections/TimelineStage";
-import { HallStage } from "@/components/sections/HallStage";
-import { TimelineCardHost } from "@/components/ui/TimelineCardHost";
-import { ProjectCardHost } from "@/components/ui/ProjectCardHost";
-import { DoorExit } from "@/components/ui/DoorExit";
+import { Work } from "@/components/sections/Work";
+import { Projects } from "@/components/sections/Projects";
+import { About } from "@/components/sections/About";
+import { PROFILE } from "@/content/profile";
+
+/**
+ * Person markup for search results.
+ *
+ * This is where the actual SEO return is for a name query — it is what lets a
+ * result carry the GitHub and LinkedIn profiles alongside the page itself.
+ */
+const PERSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: PROFILE.name,
+  description: PROFILE.blurb,
+  email: `mailto:${PROFILE.email}`,
+  address: { "@type": "PostalAddress", addressLocality: "London", addressCountry: "GB" },
+  url: PROFILE.github,
+  sameAs: [PROFILE.github, PROFILE.linkedin],
+  knowsAbout: PROFILE.interests,
+  alumniOf: { "@type": "CollegeOrUniversity", name: "University College London" },
+};
 
 export default function Home() {
   return (
     <>
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:border focus:border-arc focus:bg-void focus:px-4 focus:py-2 focus:font-mono focus:text-xs focus:text-arc"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-100 focus:rounded-full focus:bg-[var(--fg)] focus:px-4 focus:py-2 focus:text-sm focus:text-[var(--bg)]"
       >
         Skip to content
       </a>
 
-      {/* Static schematic underlay — visible even when the canvas is off. */}
-      <div
-        aria-hidden="true"
-        className="bp-grid pointer-events-none fixed inset-0 -z-10 opacity-[0.35]"
-      />
+      <Header />
 
-      <SceneRoot />
-
-      {/* All copy lives here: real HTML, server-rendered, selectable. */}
-      <main id="main" className="relative z-10">
+      <main id="main">
         <Hero />
-        <MorphStage />
-        <TimelineStage />
-        <HallStage />
+        <Work />
+        <Projects />
+        <About />
       </main>
 
-      <TimelineCardHost />
-      <ProjectCardHost />
-      <DoorExit />
+      <Footer />
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(PERSON_LD) }}
+      />
     </>
   );
 }

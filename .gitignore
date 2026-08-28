@@ -40,3 +40,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .scratch/
+
+# portrait tuning previews — regenerated on every run of the portrait scripts.
+# The committed artefacts are the JSON files in app/_portrait/, which the site
+# loads.
+scripts/portrait/preview.png
+scripts/portrait/preview-waves*.png
+scripts/portrait/__pycache__/
+
+# personal reference photo used only to generate the portrait geometry — the
+# derived JSON is what ships, this stays local.
+scripts/portrait/source.jpg
