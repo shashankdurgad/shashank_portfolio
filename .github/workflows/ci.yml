@@ -18,6 +18,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # next build/dev generate the route types (LayoutProps et al.) into
+      # .next/types; a bare tsc before any build would not see them, so
+      # generate first — it's a standalone fast type gate, not a build proxy.
+      - run: npx next typegen
       - run: npx tsc --noEmit
       - run: npm run lint
       - run: npm run build
