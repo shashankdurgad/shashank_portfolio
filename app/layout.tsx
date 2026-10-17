@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import { PROFILE } from "@/content/profile";
 import { THEME_INIT } from "@/components/ThemeToggle";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const inter = Inter({
@@ -36,8 +38,13 @@ const jetbrainsMono = JetBrains_Mono({
 const title = `${PROFILE.name} — ${PROFILE.tagline}`;
 
 export const metadata: Metadata = {
+  // Without a base, every generated OG/canonical URL is relative and scrapers
+  // resolve it against nothing — the link preview silently loses its image.
+  metadataBase: new URL(PROFILE.site),
   title,
   description: PROFILE.blurb,
+  alternates: { canonical: "/" },
+  applicationName: PROFILE.name,
   authors: [{ name: PROFILE.name, url: PROFILE.github }],
   keywords: [
     PROFILE.name,
@@ -53,11 +60,14 @@ export const metadata: Metadata = {
     description: PROFILE.blurb,
     type: "profile",
     locale: "en_GB",
+    url: PROFILE.site,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: `${PROFILE.name} — ${PROFILE.tagline}` }],
   },
   twitter: {
     card: "summary_large_image",
     title,
     description: PROFILE.blurb,
+    images: [{ url: "/og.png", width: 1200, height: 630 }],
   },
 };
 
@@ -80,7 +90,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Must run before first paint — see the note on THEME_INIT. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Cookieless first-party analytics + real-user CWV. No consent banner
+            burden, no ad pixels — see README privacy note. */}
+        <Analytics />
+        <SpeedInsights />
+      </body>
     </html>
   );
 }

@@ -379,12 +379,24 @@ export function Portrait({ className }: { className?: string }) {
         // currentColor, resolved at draw time — this is what makes the portrait
         // follow the theme without a second copy of the geometry.
         ctx.strokeStyle = getComputedStyle(canvas!).color;
-        ctx.lineWidth = Math.max(0.7, scale * 1.15);
+        // The stroke must stay well under the median line gap or the field
+        // fuses (see the note in Hero.tsx): 0.55x leaves the gaps open at
+        // every width the plate renders at, with the 0.6 floor for hairline
+        // visibility on the smallest ones.
+        ctx.lineWidth = Math.max(0.6, scale * 0.55);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
 
         ctx.beginPath();
-        for (let i = 0; i < starts.length - 1; i++) {
+        // Adaptive row stride: a line is only drawn if the physical gap under
+        // it can carry the stroke — below that the scanlines would fuse, so
+        // every other line simply goes unsampled. Density is a function of
+        // display size now, not of luck: the 390px phone shows ~57 resolved
+        // lines, the desktop shows all 115. (Assembly/breathing/repel still
+        // run on the full field; only the sampling thins.)
+        const gap = spacing * scale;
+        const rStride = gap >= 2.6 ? 1 : gap * 2 >= 2.6 ? 2 : 3;
+        for (let i = 0; i < starts.length - 1; i += rStride) {
           const from = starts[i];
           const to = starts[i + 1];
           if (to - from < 2) continue;

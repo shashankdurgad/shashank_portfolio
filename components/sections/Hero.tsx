@@ -117,9 +117,13 @@ export function Hero() {
         </div>
       </div>
 
-      {/* The focal object. Sized so the head lands near the fold on a laptop
-          without the copy above it being pushed off-screen on a phone. */}
-      <div className="relative z-10 mx-auto mt-16 w-full max-w-104 sm:mt-20">
+      {/* The focal object — and it is genuinely focal now: the plate is the
+          hero. The width floor is not taste, it is Nyquist — at 416px the
+          median line gap (~3.3px) is under the stroke width and the 115
+          scanlines fuse into a solid mass. 720px keeps the lines resolved on
+          a phone, 1350px gives the desktop head ~15px of breathing room.
+          max-w-full + page padding does the clamping on small screens. */}
+      <div className="relative z-10 mx-auto mt-16 w-full max-w-full sm:mt-20 sm:max-w-[720px] xl:max-w-[1350px]">
         <Portrait className="block w-full" />
       </div>
     </section>

@@ -29,11 +29,11 @@ import { subscribe } from "@/lib/motion/scrollDirector";
 const TRIGGER = 0.72;
 
 /*
- * The P3 timeline rewrite (plan §4) adds an optional one-line metric to the
- * data module. It is read through this widening rather than a content/ edit —
- * this file only has to tolerate the field, not own it.
+ * The P3 timeline rewrite (plan §4) landed `highlight` (a one-line metric) and
+ * `award` (honours belonging to the role) on TimelineEntry itself; the widening
+ * is kept so this file still typechecks against either shape.
  */
-type WithHighlight = TimelineEntry & { highlight?: string };
+type WithHighlight = TimelineEntry & { highlight?: string; award?: string };
 
 export function Timeline() {
   const railRef = useRef<HTMLOListElement>(null);
@@ -160,6 +160,11 @@ export function Timeline() {
                 <p className="mt-1 font-mono text-xs tabular-nums text-faint">
                   {entry.highlight}
                 </p>
+              )}
+              {/* Honours that belong to the role rather than a project card
+                  (Onflow's awards live here, not on the rail). */}
+              {entry.award && (
+                <p className="mt-1.5 text-xs text-muted sm:text-right">{entry.award}</p>
               )}
             </div>
 

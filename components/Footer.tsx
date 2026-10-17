@@ -1,12 +1,11 @@
 import { PROFILE } from "@/content/profile";
+import { CopyEmail } from "@/components/CopyEmail";
 
 /*
- * Merge note: `CopyEmail` (another agent's, P2b) wires in here — once
- * components/CopyEmail.tsx exists, import it and render it beside the Email
- * link so a visitor can take the address without a mail client opening.
+ * Email leaves the LINKS list: CopyEmail owns the address — the clipboard pill
+ * and the honest mailto beside it, one tap each way.
  */
 const LINKS = [
-  { href: `mailto:${PROFILE.email}`, label: "Email", external: false },
   { href: PROFILE.github, label: "GitHub", external: true },
   { href: PROFILE.linkedin, label: "LinkedIn", external: true },
   // The résumé carries what the page deliberately omits (phone, module
@@ -22,7 +21,8 @@ export function Footer() {
           {PROFILE.name} · {PROFILE.location}
         </p>
 
-        <nav className="flex flex-wrap gap-5">
+        <nav className="flex flex-wrap items-center gap-5">
+          <CopyEmail />
           {LINKS.map((link) => (
             <a
               key={link.label}

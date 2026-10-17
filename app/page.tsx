@@ -5,6 +5,7 @@ import { Work } from "@/components/sections/Work";
 import { Projects } from "@/components/sections/Projects";
 import { Leadership } from "@/components/sections/Leadership";
 import { About } from "@/components/sections/About";
+import { BackToTop } from "@/components/BackToTop";
 import { PROFILE } from "@/content/profile";
 import { SKILLS } from "@/content/skills";
 
@@ -29,6 +30,9 @@ const PERSON_LD = {
   email: `mailto:${PROFILE.email}`,
   address: { "@type": "PostalAddress", addressLocality: "London", addressCountry: "GB" },
   url: PROFILE.site,
+  // The OG card doubles as the Person image — the name query can show the
+  // face that is the site, rather than a default letter tile.
+  image: `${PROFILE.site}/og.png`,
   sameAs: [PROFILE.github, PROFILE.linkedin],
   knowsAbout: SKILLS.flatMap((group) => group.items).slice(0, 16),
   alumniOf: { "@type": "CollegeOrUniversity", name: "University College London" },
@@ -55,6 +59,7 @@ export default function Home() {
       </main>
 
       <Footer />
+      <BackToTop />
 
       <script
         type="application/ld+json"

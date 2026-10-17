@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { PROFILE } from "@/content/profile";
+import { PROFILE, NAV as PROFILE_NAV } from "@/content/profile";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { MobileNav } from "@/components/MobileNav";
 import { subscribe } from "@/lib/motion/scrollDirector";
@@ -22,11 +22,12 @@ import { subscribe } from "@/lib/motion/scrollDirector";
  * mobile sheet) or under reduced motion.
  */
 
-const NAV = [
-  { href: "#work", label: "Work" },
-  { href: "#projects", label: "Projects" },
-  { href: "#about", label: "About" },
-];
+/*
+ * Nav lives in content/profile.ts — the page composition and the mobile sheet
+ * read the same list, so a section can no longer exist in one place and be
+ * missing from another.
+ */
+const NAV = PROFILE_NAV;
 
 /** Travel before the header starts hiding — small jitters shouldn't trigger it. */
 const HIDE_AFTER = 80;
