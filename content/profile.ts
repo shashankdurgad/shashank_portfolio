@@ -5,11 +5,12 @@
  * root layout's metadata. One module now, because those two copies had already
  * started to drift.
  *
- * v3 splits what the hero says into named parts: `tagline` is the one-sentence
- * claim, `blurb` the supporting pitch with its proof sentence, `roles` the
- * role line, `proof` the three stat tiles. They are deliberately separate
- * fields — the old About section pasted the hero blurb verbatim, and distinct
- * keys make re-merging them a compile-visible decision, not a copy-paste drift.
+ * v3 splits the hero's pieces into named parts: `tagline` is the one-sentence
+ * claim, `roles` the role line, `proof` the three stat tiles — and `blurb`,
+ * which after the 2026-10 word-cut pass serves only metadata and JSON-LD.
+ * They are deliberately separate fields — the old About section pasted the
+ * hero blurb verbatim, and distinct keys make re-merging them a
+ * compile-visible decision, not a copy-paste drift.
  *
  * Deliberate absences, per the v3 decision log: no phone number, no
  * scholarship line, no availability notice. The résumé PDF is the only place
@@ -31,8 +32,14 @@ export const NAV = [
 export const PROFILE = {
   name: "Shashank Durgad",
   tagline: "I build agentic AI systems — and prove they work.",
+  /**
+   * Metadata/JSON-LD only — the hero stopped rendering this in the 2026-10
+   * word-cut pass: roles + tagline + proof tiles already say it, in fewer
+   * words. It survives as the <meta description> because search snippets
+   * want one complete sentence.
+   */
   blurb:
-    "CS at UCL, founding engineer at Onflow. I build agentic systems — and the traces, evals and fine-tuning loops that make them measurably better. So far: three major hackathon wins, an arXiv paper on evaluating computer-use agents, and a beta that converted 30%.",
+    "CS at UCL, founding engineer at Onflow — I build agentic systems and the eval loops that prove they work.",
   location: "London, UK",
   email: "shashankdurgad@gmail.com",
   github: "https://github.com/shashankdurgad",

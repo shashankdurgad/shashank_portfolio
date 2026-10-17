@@ -19,7 +19,11 @@ export type LeadershipEntry = {
   role: string;
   period?: string;
   kind: "leadership" | "cohort" | "exposure";
-  detail: string[];
+  /**
+   * One line, ≤12 words — the 2026-10 word budget. Optional because a card
+   * whose award badge already carries the claim needs no bullet.
+   */
+  detail?: string[];
   /** Programme honours, rendered with the award badge idiom. */
   award?: string;
 };
@@ -32,9 +36,7 @@ export const LEADERSHIP: LeadershipEntry[] = [
     period: "Nov 2025 — Present",
     kind: "leadership",
     detail: [
-      "Moderated a fireside chat with the ex-COO of Citadel Securities on data and AI infrastructure.",
-      "Helped organise Project Labs: a 6-week data science project build for 100+ students.",
-      "Runs hiring, outreach and the workshop and speaker programme for the academic year.",
+      "Ran the society's programme; moderated a fireside chat with Citadel Securities' ex-COO.",
     ],
   },
   {
@@ -44,7 +46,7 @@ export const LEADERSHIP: LeadershipEntry[] = [
     period: "Dec 2025 — Jun 2026",
     kind: "leadership",
     detail: [
-      "Spearheaded the society's HCI research track through UCL Nexus Labs — the published work itself sits on the Avenir-UX card above.",
+      "Built the society's HCI research track — the paper sits on the Avenir-UX card.",
     ],
   },
   {
@@ -52,7 +54,7 @@ export const LEADERSHIP: LeadershipEntry[] = [
     name: "Foundry Labs",
     role: "Cohort 4",
     kind: "cohort",
-    detail: ["Selected into UCL's startup incubator cohort, building Onflow through the founder programme."],
+    detail: ["UCL's startup incubator cohort — built Onflow inside the founder programme."],
   },
   {
     id: "bsa",
@@ -60,14 +62,16 @@ export const LEADERSHIP: LeadershipEntry[] = [
     role: "Cohort member",
     kind: "cohort",
     award: "Demo Day Winner",
-    detail: ["Pitched Onflow through the programme and won 1st Place at Demo Day."],
+    // No detail line: the award badge already says it won Demo Day, and a
+    // bullet restating the badge is exactly the padding this section is cut
+    // of. Pitched Onflow; won. The badge is the sentence.
   },
   {
     id: "ucl-entrepreneurs",
     name: "UCL Entrepreneurs",
     role: "Member",
     kind: "cohort",
-    detail: ["Student-run founder society; the peer group behind the UCL startup ecosystem."],
+    detail: ["Founder society; the peer group behind UCL's startup scene."],
   },
   {
     id: "pg-insight",
@@ -75,8 +79,6 @@ export const LEADERSHIP: LeadershipEntry[] = [
     role: "Selected cohort",
     period: "8 – 11 Jun 2026",
     kind: "exposure",
-    detail: [
-      "Sessions with P&G leaders including the UK Managing Director: commercial thinking, decision-making under uncertainty, personal branding.",
-    ],
+    detail: ["Sessions with P&G leaders including the UK Managing Director."],
   },
 ];

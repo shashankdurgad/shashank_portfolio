@@ -55,10 +55,8 @@ export const PROJECTS: Project[] = [
     tier: "selected",
     role: "Founding Engineer & Growth Lead",
     detail: [
-      "An agentic platform that simulates real user behaviour against a live product and turns the traces into actionable UX feedback and codegen fixes.",
-      "LangChain drives the agents, Playwright drives the browser, and the GitHub API and Gemini CLI close the loop with automated fixes.",
-      "Synthetic automated user testing drove a 30% conversion rate in preliminary beta.",
-      "2nd Place at the Gemini 3 London Hackathon (with US$30k in GCP credits), judged by Google; shortlisted for the Google AI Futures Fund interview.",
+      "Live-product user simulation; traces become UX feedback and codegen fixes.",
+      "LangChain agents, Playwright automation, GitHub API and Gemini CLI close the loop.",
     ],
     stack: ["Next.js", "GitHub API", "Playwright", "LangChain", "Gemini CLI"],
     metrics: [{ value: "30%", label: "beta conversion" }],
@@ -82,9 +80,8 @@ export const PROJECTS: Project[] = [
     period: "Sep 2026",
     tier: "selected",
     detail: [
-      "Webcam teleoperation environment: a Franka FR3 with a five-finger hand in SuperDex, with a replay gate that keeps only demos that lift and hold.",
-      "A Daytona simulation engine runs 289 parallel replays per task to measure its robust region, widening it from 5 mm to 25 mm.",
-      "A synthetic-data pipeline samples inside the measured robust region: roughly 800 verified episodes an hour from two human demos.",
+      "Franka FR3 webcam teleop in SuperDex; a replay gate keeps only lift-and-hold demos.",
+      "Daytona engine maps the robust region; synthetic data samples inside it only.",
     ],
     stack: ["Python", "Computer Vision", "Robotics Simulation", "Synthetic Data"],
     metrics: [
@@ -108,10 +105,8 @@ export const PROJECTS: Project[] = [
     award: "Environment Track Winner — NVIDIA GTC Hack for Impact",
     tier: "selected",
     detail: [
-      "A decentralised system where Nemotron-powered autonomous agents negotiate satellite collision avoidance manoeuvres in seconds, reducing debris cascades.",
-      "Dual-path collision risk classifier pairing rule-based thresholds with an XGBoost model (8 features, 4 risk classes) to capture compound interactions beyond hard rules.",
-      "Real-time feature extraction from live CelesTrak conjunction data and NOAA space weather feeds.",
-      "A RAG workflow over past conjunction incidents grounds the agents' negotiation arguments.",
+      "Nemotron agents negotiate collision manoeuvres in seconds; RAG over past incidents grounds the arguments.",
+      "Dual-path risk classifier: rule thresholds plus XGBoost (4 classes) over live CelesTrak/NOAA feeds.",
     ],
     stack: ["Python", "XGBoost", "NumPy", "FastAPI", "Pydantic"],
     links: [
@@ -130,9 +125,8 @@ export const PROJECTS: Project[] = [
     tier: "selected",
     role: "First-Year Representative, UCL AI Society",
     detail: [
-      "Computer-use agents that interact with real web pages from pixels rather than DOM parses, keeping a coherent trace of each simulated user journey.",
-      "Evaluation protocol integrates the System Usability Scale with step-wise Single Ease Questions; research run through UCL Nexus Labs.",
-      "Co-authored, published research on pixel-grounded automated usability evaluation (arXiv 2604.09581).",
+      "Agents operate real pages from pixels, not DOM parses, tracing each user journey.",
+      "SUS + Single Ease Question protocol, through UCL Nexus Labs; co-authored work on arXiv.",
     ],
     stack: ["Python", "Computer-Use Agents", "Multimodal Grounding"],
     links: [
@@ -153,7 +147,7 @@ export const PROJECTS: Project[] = [
     award: "1st Place — UCL BUILD AI Festival",
     tier: "other",
     detail: [
-      "LangGraph and NVIDIA Nemotron drive a patrol swarm using pheromone-based sampling and quorum voting, escalating findings through a 4-stage investigation pipeline into SQLite and NetworkX.",
+      "LangGraph + Nemotron patrol swarm: pheromone sampling, quorum voting, 4-stage pipeline into SQLite.",
     ],
     stack: ["Python", "LangGraph", "SQLite", "NetworkX", "FastAPI"],
     links: [
@@ -172,7 +166,7 @@ export const PROJECTS: Project[] = [
     award: "2nd Place Globally — FIRST Global Challenge",
     tier: "other",
     detail: [
-      "Built the CV sorting pipeline with Team Singapore (fielded alongside Team Iran) in the Environment category.",
+      "Built the CV sorting pipeline with Team Singapore, fielded alongside Team Iran.",
     ],
     stack: ["Computer Vision", "Robotics"],
     links: [],
@@ -184,7 +178,7 @@ export const PROJECTS: Project[] = [
     period: "Mar 2026",
     tier: "other",
     detail: [
-      "A React SPA that tracks progressive-overload programmes entirely offline — Dexie over IndexedDB is the store of record — with a local recommendation engine adjusting each session from logged performance.",
+      "Offline-first React SPA; Dexie/IndexedDB as store of record, local recommendation engine.",
     ],
     stack: ["React", "TypeScript", "Dexie", "IndexedDB"],
     links: [],
@@ -196,7 +190,7 @@ export const PROJECTS: Project[] = [
     period: "Jan 2019 – Apr 2021",
     tier: "other",
     detail: [
-      "An iOS app that sorts tasks into urgent/important quadrants; built through the Swift Accelerator Programme and shipped to the App Store. No live link to point at — it predates every habit in the entries above.",
+      "Eisenhower-quadrant task sorting, shipped to the App Store via the Swift Accelerator Programme.",
     ],
     stack: ["Swift", "iOS"],
     // Deliberately no link: the App Store listing is not verifiable from the

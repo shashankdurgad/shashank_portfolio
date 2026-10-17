@@ -50,16 +50,18 @@ export function Leadership() {
                 </p>
               )}
 
-              <ul className="mt-3 space-y-2">
-                {entry.detail.map((line) => (
-                  <li
-                    key={line}
-                    className="text-sm leading-relaxed text-muted before:mr-2 before:text-faint before:content-['—']"
-                  >
-                    {line}
-                  </li>
-                ))}
-              </ul>
+              {entry.detail && entry.detail.length > 0 && (
+                <ul className="mt-3 space-y-2">
+                  {entry.detail.map((line) => (
+                    <li
+                      key={line}
+                      className="text-sm leading-relaxed text-muted before:mr-2 before:text-faint before:content-['—']"
+                    >
+                      {line}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </article>
           ))}
         </div>

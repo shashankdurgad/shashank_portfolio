@@ -14,7 +14,7 @@ import { CursorGrid } from "@/components/CursorGrid";
  */
 export function Hero() {
   return (
-    <section id="top" className="relative px-6 pt-20 pb-24 sm:pt-28">
+    <section id="top" className="relative px-6 pt-16 pb-16 sm:pt-20 sm:pb-20">
       {/* Sits behind the copy and the portrait, and never takes the pointer —
           the portrait's own repel effect has to keep receiving it.
           z-0, not a negative index: the page background lives on <html>, and a
@@ -55,10 +55,6 @@ export function Hero() {
         {/* The claim. Sized as a statement, not as a second heading. */}
         <p className="mx-auto mt-6 max-w-xl text-2xl leading-snug font-medium tracking-[-0.02em]">
           {PROFILE.tagline}
-        </p>
-
-        <p className="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-muted">
-          {PROFILE.blurb}
         </p>
 
         <div className="mx-auto mt-9 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
@@ -117,13 +113,13 @@ export function Hero() {
         </div>
       </div>
 
-      {/* The focal object — and it is genuinely focal now: the plate is the
-          hero. The width floor is not taste, it is Nyquist — at 416px the
-          median line gap (~3.3px) is under the stroke width and the 115
-          scanlines fuse into a solid mass. 720px keeps the lines resolved on
-          a phone, 1350px gives the desktop head ~15px of breathing room.
-          max-w-full + page padding does the clamping on small screens. */}
-      <div className="relative z-10 mx-auto mt-16 w-full max-w-full sm:mt-20 sm:max-w-[720px] xl:max-w-[1350px]">
+      {/* The punctuation, not the shout: the plate sits below the fold on a
+          laptop and the copy leads. The width floor is Nyquist, not taste —
+          below ~350px the median line gap falls under the stroke width and
+          scanlines fuse, which is what the canvas's adaptive row stride is
+          for; these caps keep most viewports above it anyway. Owner's size
+          call, 2026-10: the earlier 1350px plate upstaged the words. */}
+      <div className="relative z-10 mx-auto mt-12 w-full max-w-[380px] sm:mt-16 sm:max-w-[460px] lg:max-w-[560px] xl:max-w-[672px]">
         <Portrait className="block w-full" />
       </div>
     </section>
