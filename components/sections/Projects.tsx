@@ -319,7 +319,7 @@ export function Projects() {
                 >
                   <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
                     <div className="min-w-0">
-                      <h3 className="text-lg font-medium tracking-[-0.01em]">
+                      <h3 className="font-display text-3xl font-normal tracking-[-0.02em]">
                         {/* The decode happens here, in mono, where a glyph
                             swap costs zero layout shift; the section heading
                             itself stays plain. */}

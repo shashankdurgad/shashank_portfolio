@@ -52,7 +52,7 @@ export function SectionHeading({
       </p>
       {/* The mask clips the rise; the inner span's pb keeps descenders from
           meeting the same edge (leading alone is too tight at this size). */}
-      <h2 className="mt-2 overflow-hidden text-2xl font-medium tracking-[-0.02em] sm:text-3xl">
+      <h2 className="mt-2 overflow-hidden font-display text-display font-normal tracking-[-0.02em]">
         <span
           ref={innerRef}
           className="block pb-1 transition-none data-[armed=true]:translate-y-3 data-[armed=true]:transition-transform data-[armed=true]:duration-[550ms] data-[armed=true]:ease-out data-[risen=true]:translate-y-0"

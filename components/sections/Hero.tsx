@@ -24,7 +24,7 @@ export function Hero() {
       <div className="relative mx-auto max-w-3xl text-center">
         <p className="text-sm text-faint">{PROFILE.location}</p>
 
-        <h1 className="mt-5 text-[clamp(2.5rem,7vw,4.25rem)] leading-[1.05] font-medium tracking-[-0.03em]">
+        <h1 className="mt-5 font-display text-display font-normal tracking-[-0.02em]">
           {PROFILE.name}
         </h1>
 

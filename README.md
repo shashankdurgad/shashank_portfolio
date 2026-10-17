@@ -1,98 +1,113 @@
-# shashank_portfolio
+# shashankdurgad.com
 
-## v2 (active)
-
-The live project lives at the repo root. Next.js 16, React 19, Tailwind 4.
+Personal site. Live at [shashankdurgad.com](https://www.shashankdurgad.com).
+Next.js 16 (App Router, Turbopack), React 19, Tailwind 4, fully static — every
+byte here is prerendered; the server exists only on `next start` for CI.
 
 ```bash
 npm install
 npm run dev
 ```
 
-### The portrait
+## The rules (why the code looks like this)
+
+**Server HTML is the finished, readable end state. JS only arms decoration.**
+Every animation on the page follows the same choreography: the prerendered
+document already shows the final frame; a client effect flips a `data-armed`
+attribute after mount and the CSS transitions take it from there. No-JS,
+hydration failure, and `prefers-reduced-motion` all degrade to the finished
+page, never to blank boxes. This is the oldest rule in the repo and predates
+v2 — keep honouring it.
+
+**No `setState` in scroll or pointer paths.** Scroll work rides
+`lib/motion/scrollDirector.ts`: one passive listener, rAF-batched, parks
+70 ms after the last event, publishes positions as the registered `--p`
+custom property. Components read it in CSS. If a new effect needs scroll
+position, subscribe to the director; do not add a second listener.
+
+**Canvas loops park.** The portrait and the cursor grid idle at zero CPU:
+settled fields snap home and stop calling `requestAnimationFrame`, off-screen
+or hidden-tab means parked. New canvas features inherit this contract.
+
+**Tokens, not literals.** Theme colours are CSS custom properties in
+`app/globals.css` (near-black ↔ off-white swap; one cold `--color-signal`
+token for "live" state; amber `--color-accent` means *award* and nothing
+else — the focus ring moved off it in v3 for exactly that reason). Type:
+Inter for everything, Instrument Serif for the display scale
+(`font-display` + `text-display`), JetBrains Mono for data (periods,
+metrics, eyebrows — always `tabular-nums`).
+
+## The portrait
 
 The hero portrait is line art generated from a photograph, and the lines push
-away from the cursor.
+away from the cursor. Geometry is generated **offline** — never in the
+browser — and shipped as data.
 
-Geometry is generated **offline** — it is not computed in the browser. There are
-two styles, and they are genuinely different techniques rather than presets:
+The shipped format (`app/_portrait/portrait-geom.json`, ~170 KB raw / ~23 KB
+brotli, both themes in one file) encodes each y-delta as one printable
+character (`value = charCode − 47`), because the scanline x-zigzag is
+byte-identical across all 115 lines and every y-delta fits −12..+12. Both
+themes must ship together (67% of the light values differ from dark; a
+theme toggle has to be instant) but as strings, not array literals — the
+whole file is a **lazy chunk** (`await import` inside the effect), off the
+initial load and off the hydration path: parse+decode ≈ 0.4 ms vs the ~5 ms
+the old inlined-JSON format cost. `node scripts/portrait/bench.mjs` re-runs
+the round-trip proof (`python3 scripts/portrait/encode.py` refused to emit
+anything not integer-exact) and the benchmark.
 
-```bash
-# amplitude-modulated scanlines — evenly spaced horizontal lines whose zigzag
-# amplitude carries the tone. Currently active.
-python3 scripts/portrait/waves.py
-
-# flowline hatching — lines follow tone contours, tone carried by line density.
-python3 scripts/portrait/trace.py
-
-# either script, preview only:
-python3 scripts/portrait/waves.py --preview-only
-```
-
-Both write to `app/_portrait/portrait.json` (committed), so **whichever ran last
-is what the site shows**. Both read `scripts/portrait/source.jpg` and emit the
-same format, and the renderer adapts to either — it measures the line spacing of
-whatever it loads and scales the repel displacement to match, because the two
-styles differ in density by roughly a factor of four.
-
-Previews (`preview.png`, `preview-waves.png`) are gitignored; they exist for
-tuning by eye.
-
-Needs only PIL and numpy. Every tunable sits at the top of its script with a note
-on what it trades off — several carry measurements taken against this specific
-photo, so read the comment before changing one.
-[Portrait.tsx](components/portrait/Portrait.tsx) renders the result to a canvas
-and runs the repel physics.
-
-**Two geometries ship, one per theme.** Line art drawn for paper puts ink where
-the photo is *dark*. Rendered light-on-dark that mapping inverts — the hair
-becomes the brightest thing on the face and the portrait reads as an X-ray. So
-strokes have to follow lightness on a dark ground and darkness on a light one,
-and no single geometry is right in both.
-
-`waves.py` emits `portrait-dark.json` and `portrait-light.json` in one run (see
-`VARIANTS`), and [Portrait.tsx](components/portrait/Portrait.tsx) swaps between
-them on theme change. Both share line topology and vertex count, so the swap
-copies new rest positions into the existing buffers and the spring eases into
-them — nothing re-allocates and a mid-hover toggle stays smooth. Costs ~74KB
-gzipped for the pair rather than ~36KB for one.
-
-**Known limitation**: `waves.py` leaves a visible edge down the side of each ear,
-where the flat lines of the hair meet the tall waves of the lit ear. It is
-inherent to straight horizontal scanlines crossing a near-vertical tonal
-boundary, not a bug in the tone field. The header comment in that file records
-the five fixes that were measured and why each was rejected — read it before
-attempting a sixth. `trace.py` does not have the problem at all, because its
-lines follow the form and wrap around the ear rather than crossing it.
-
-### The hero grid
-
-[CursorGrid.tsx](components/CursorGrid.tsx) draws a grid behind the hero that is
-invisible at rest. Lines appear only within a radius of the pointer, and that
-radius tracks pointer *speed* — a fast sweep opens a wide pool, a slow drift
-barely disturbs it. Stop moving and it closes completely.
-
-Canvas rather than a CSS mask over a background image: the radius changes every
-frame, and animating that through style recalcs would thrash layout. It strokes
-in `currentColor`, so one implementation covers both themes, and it parks its
-rAF loop once the pool has closed. Disabled entirely under
-`prefers-reduced-motion`, and ignored for touch pointers, which have no hover to
-reveal it with.
-
-Note the canvas sits at `z-0`, not a negative index: the page background lives on
-`<html>`, and a negative index puts the canvas behind that and paints it out.
-
-## v1 (archived)
-
-The previous site — a scroll-driven three.js/R3F experience — is frozen in [v1/](v1/)
-for reference. It is excluded from the root TypeScript project and ESLint config, and
-its dependencies are not installed at the root.
-
-To run it, install and build inside that folder:
+Regenerating the artwork itself needs `scripts/portrait/source.jpg`, which is
+gitignored (it's a photo of a person):
 
 ```bash
-cd v1 && npm install && npm run dev
+python3 scripts/portrait/waves.py   # amplitude-modulated scanlines (active)
+python3 scripts/portrait/trace.py   # flowline hatching (alternate style)
 ```
 
-Its own notes are in [v1/README.md](v1/README.md), [v1/CONTENT.md](v1/CONTENT.md),
-and [v1/CONTRIBUTING-AGENTS.md](v1/CONTRIBUTING-AGENTS.md).
+Those emit the legacy two-file format; `encode.py` (its one-time converter)
+documents how to get back to v2. The renderer adapts to either style's
+density: the repel displacement is scaled by the *measured* median line gap.
+
+At small widths the physical line gap falls under the stroke width and 115
+scanlines fuse into a solid mass, so the canvas picks a row stride from the
+actual gap (`draw()` in `Portrait.tsx`) and the hero plate sizes itself to a
+Nyquist-safe floor. Behaviour layers — assembly on load, idle breathing,
+scroll dissolve, touch tap-ripple — all compose through the rest-anchored
+spring (effects modify the spring's *target*, never the position) and none
+run under reduced motion. Gaze needs eye coordinates from `source.jpg`
+(port `find_eyes()` from `trace.py`) and is waiting on the owner.
+
+## Content
+
+Everything the page says lives in `content/*.ts` — typed, ordered
+explicitly, no runtime sorting, one module per kind. Adding a section means
+a new module plus one line in `app/page.tsx`; the header nav reads the same
+`NAV` list. `public/resume.pdf` carries what the site deliberately omits
+(phone, module grades) — by decision, not by omission.
+
+## Privacy
+
+Cookieless first-party analytics only (`@vercel/analytics` +
+`@vercel/speed-insights`, ~1–3 KB, no stored identifiers, no consent banner
+required under ICO guidance for this class of script). No ad pixels, no
+LinkedIn insight tag, ever. Adding a third-party script is a deliberate act,
+not a dependency bump.
+
+## Budgets
+
+Lighthouse (mobile, simulated) on `next start` at the v3 merge: performance
+83 / accessibility 96 / best-practices 96 / SEO 100, CLS 0.00. The measured
+goals that guide changes: LCP < 2.5 s under simulation (font-swap bound),
+JS ≤ 240 KB gz initial, CSS ≤ 10 KB gz, total ≤ 420 KB gz. The portrait
+payload is the one number that grew deliberately: it bought the artwork.
+
+## CI
+
+`.github/workflows/ci.yml` runs the local trio — `tsc --noEmit`, `eslint`,
+`next build` — on every PR. The dev loop *is* the gate; the workflow exists
+so a forgotten local run can't reach `main`.
+
+## v1
+
+`v1/` is the archived WebGL predecessor (a 3D "hall" with an animated
+character). It is frozen: not linted, excluded from tsconfig, kept for
+reference and its `CONTENT.md` archaeology. Nothing imports it.

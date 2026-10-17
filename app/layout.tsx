@@ -19,16 +19,19 @@ const inter = Inter({
  * alias that resolved to itself would be a CSS cycle, not a fallback.
  */
 const instrumentSerif = Instrument_Serif({
-  // Only weight Google ships; italic joins so pull-quotes can set in it.
+  // Only weight Google ships. Italic joins only when a pull-quote actually
+  // ships — a preloaded face nothing sets in is a second render-blocking
+  // request for the LCP's own type (measured in v3's first Lighthouse run).
   weight: "400",
-  style: ["normal", "italic"],
+  style: ["normal"],
   variable: "--font-instrument-serif",
   subsets: ["latin"],
   display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
-  // 400 for data rows, 500 for eyebrows where the small size needs the weight.
+  // Two static weights — this Next's google loader has no variable-range
+  // option, and static files are smaller than a variable face would be.
   weight: ["400", "500"],
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
