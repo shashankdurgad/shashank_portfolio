@@ -319,3 +319,154 @@
     transform: translateY(12px);
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Projects showcase (plan §3, "index + stacked acts").
+ *
+ * Everything here is namespaced under [data-deck] / [data-marquee] /
+ * [data-glyph-plate] so nothing can reach a section that did not ask for it.
+ *
+ * The stacking is decoration and it is gated like everything else on this
+ * site: position: sticky only exists under [data-armed], which only
+ * components/sections/Projects.tsx sets, only when motion is not reduced —
+ * so JS-off, RM and pre-hydration all read the plain card flow the server
+ * rendered. The reduced-motion block below is the belt: if preferences
+ * change mid-session (or the attribute is ever set without the effect's
+ * gate), the geometry still goes back to flow.
+ * ------------------------------------------------------------------------- */
+
+/* The deck layout is a lg invention: a sticky rail beside sticky-stacking
+   acts needs the second column to exist at all. 64rem is Tailwind's lg —
+   the layout breakpoint deliberately mirrors it. */
+@media (min-width: 64rem) {
+  [data-deck][data-armed="true"] [data-act] {
+    position: sticky;
+    /* The shelf every card stacks on — SHELF_PX in Projects.tsx. */
+    top: 6rem;
+  }
+
+  /* The outgoing act, marked [data-out] by the scroll writer only while its
+     cover fraction is above zero: an act at rest carries no transform, no
+     filter and no layer at all. --p (registered <number>) is written by the
+     ScrollDirector subscriber on this very act. */
+  [data-deck][data-armed="true"] [data-act][data-out="true"] [data-act-card] {
+    transform-origin: top center;
+    transform: scale(calc(1 - 0.03 * var(--p)));
+    filter: var(--deck-dim-filter);
+    opacity: var(--deck-dim-opacity);
+  }
+}
+
+/* The dim itself, per theme. Declared on [data-act] — the element that
+   carries --p — because custom properties are substituted at the element
+   where they are computed: declared on the deck root, var(--p) would freeze
+   at the root's 0 and every card would inherit a permanently flat dim.
+
+   Dark: brightness, the photographic reading of "this card is behind".
+   Light: brightness on ink is mud, so the card steps back with opacity
+   instead — to 0.94 at full cover, matching the plan. */
+[data-deck] [data-act] {
+  --deck-dim-filter: brightness(calc(1 - 0.15 * var(--p)));
+  --deck-dim-opacity: 1;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) [data-deck] [data-act] {
+    --deck-dim-filter: none;
+    --deck-dim-opacity: calc(1 - 0.06 * var(--p));
+  }
+}
+
+:root[data-theme="light"] [data-deck] [data-act] {
+  --deck-dim-filter: none;
+  --deck-dim-opacity: calc(1 - 0.06 * var(--p));
+}
+
+/* Belt for the whole deck, as above: no motion, no geometry. !important
+   because this is the same "last word" class of rule as the global RM block
+   at the top of this file. */
+@media (prefers-reduced-motion: reduce) {
+  [data-deck] [data-act] {
+    position: static !important;
+  }
+
+  [data-deck] [data-act] [data-act-card] {
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/*
+ * The trophy marquee (components/TrophyMarquee.tsx).
+
+ * The track is two identical copies of the win list; the keyframe ends at
+ * exactly one copy's width (-50%), which is the second copy's start, so the
+ * loop seam is invisible. 40s is the whole two-copy traverse — about 8s per
+ * win at realistic widths, which is skimmable, not flashing. It is a
+ * compositor transform on aria-hidden text, so it costs no layout, and
+ * hover/focus pausing gives anyone who wants to read a fixed frame.
+ *
+ * Reduced motion takes the motion, not the content: the track unwraps into a
+ * static wrapped list and the second copy — which only exists to feed the
+ * seam — steps out.
+ */
+[data-marquee-track] {
+  display: flex;
+  width: max-content;
+  animation: trophy-marquee 40s linear infinite;
+}
+
+@keyframes trophy-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+[data-marquee]:hover [data-marquee-track],
+[data-marquee]:focus-within [data-marquee-track] {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-marquee-track] {
+    animation: none;
+    width: auto;
+    transform: none;
+    flex-wrap: wrap;
+  }
+
+  [data-marquee-copy] {
+    white-space: normal;
+  }
+
+  [data-marquee-copy]:last-child {
+    display: none;
+  }
+}
+
+/*
+ * The emblem plate (components/canvas/ProjectGlyph.tsx).
+
+ * Same physical language as the portrait: an inset ground behind a hairline
+ * frame. The highlight hairline is the dark-theme-only illusion it has
+ * always been, so the light themes trade it for a soft inset shadow, on the
+ * model of the light --shadow-e2.
+ */
+[data-glyph-plate] {
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background-color: var(--bg-inset);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) [data-glyph-plate] {
+    box-shadow: inset 0 1px 2px rgb(22 22 26 / 0.06);
+  }
+}
+
+:root[data-theme="light"] [data-glyph-plate] {
+  box-shadow: inset 0 1px 2px rgb(22 22 26 / 0.06);
+}
