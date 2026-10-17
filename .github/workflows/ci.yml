@@ -1,0 +1,27 @@
+name: ci
+
+# The gate for every phase of this repo: a PR is only as green as the trio
+# that the local workflow already runs. Everything else in CI builds on this.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # next build/dev generate the route types (LayoutProps et al.) into
+      # .next/types; a bare tsc before any build would not see them, so
+      # generate first — it's a standalone fast type gate, not a build proxy.
+      - run: npx next typegen
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run build

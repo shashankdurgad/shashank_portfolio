@@ -1,9 +1,16 @@
 import { PROFILE } from "@/content/profile";
+import { CopyEmail } from "@/components/CopyEmail";
 
+/*
+ * Email leaves the LINKS list: CopyEmail owns the address — the clipboard pill
+ * and the honest mailto beside it, one tap each way.
+ */
 const LINKS = [
-  { href: `mailto:${PROFILE.email}`, label: "Email", external: false },
   { href: PROFILE.github, label: "GitHub", external: true },
   { href: PROFILE.linkedin, label: "LinkedIn", external: true },
+  // The résumé carries what the page deliberately omits (phone, module
+  // grades), so it is a link here rather than content on the page.
+  { href: PROFILE.resume, label: "Résumé", external: false },
 ];
 
 export function Footer() {
@@ -14,7 +21,8 @@ export function Footer() {
           {PROFILE.name} · {PROFILE.location}
         </p>
 
-        <nav className="flex flex-wrap gap-5">
+        <nav className="flex flex-wrap items-center gap-5">
+          <CopyEmail />
           {LINKS.map((link) => (
             <a
               key={link.label}

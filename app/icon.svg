@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Monogram mark. The scanline glyph echoes the portrait's line-art engine:
+       the letterform is built from the same idea (tone carried by lines).
+       Amber is the award accent — the icon is the one brand surface that may
+       wear it, because it is identity, not emphasis. -->
+  <rect width="64" height="64" rx="14" fill="#0a0a0b"/>
+  <g stroke="#d99a2b" stroke-width="3" stroke-linecap="round">
+    <path d="M16 20h12M16 28h18M16 36h12M16 44h18"/>
+    <path d="M38 20h10M38 28h16M38 36h10M38 44h16"/>
+  </g>
+</svg>
