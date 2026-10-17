@@ -12,8 +12,8 @@
 
 export const ABOUT: { paras: string[] } = {
   paras: [
-    "The long route: ACS (Independent), then two years as a sergeant in the Singapore Police Force — negotiating real incidents, automating the department's data on the side. Surveying 2,000+ SME owners at 108 Growth Partners pointed me at data; UCL CS is where it landed.",
-    "One obsession: agentic systems that measurably work. As product (Onflow, a 30%-converting beta), as platform (Overmind's eval pipeline), as research (arXiv). Ship it, instrument it, evaluate it, improve it — the loop is the point.",
-    "Currently: second year at UCL, Vice-President of the Data Science Society, and pointing at robot learning with BuildAPolicy.",
+    "The long route: ACS (Independent), then two years as a Singapore Police Force sergeant — negotiating real incidents, automating the department's data. Surveying 2,000+ SME owners at 108 Growth Partners pointed me at data; UCL CS is where it landed.",
+    "One obsession: agentic systems that measurably work. As product (Onflow, a 30%-converting beta), as platform (Overmind's eval pipeline), as research (arXiv). Ship, instrument, evaluate, improve — the loop is the point.",
+    "Currently: second year at UCL, Vice-President of the Data Science Society, pointing at robot learning with BuildAPolicy.",
   ],
 };
