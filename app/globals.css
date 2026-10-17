@@ -470,3 +470,59 @@
 :root[data-theme="light"] [data-glyph-plate] {
   box-shadow: inset 0 1px 2px rgb(22 22 26 / 0.06);
 }
+
+/* ---------------------------------------------------------------------------
+ * The trace waterfall (components/sections/Timeline.tsx).
+ *
+ * The rows are native <details>: the toggle works with zero JS, so all CSS
+ * here does is remove the UA marker chrome, run the mono +/− glyph, and gate
+ * the bars' one-time draw-in. Everything is namespaced under [data-trace] and
+ * every animated rule additionally requires [data-armed], which the component
+ * sets only when motion is not reduced — the same arm-after-mount contract as
+ * the deck above: JS-off, RM and pre-hydration all render bars full.
+ * ------------------------------------------------------------------------- */
+
+/* The UA disclosure triangle goes; the label column's +/− is the affordance,
+   flipping on [open] without a line of script. */
+[data-trace] summary {
+  list-style: none;
+}
+
+[data-trace] summary::-webkit-details-marker {
+  display: none;
+}
+
+[data-trace] [data-trace-toggle]::before {
+  content: "+";
+}
+
+[data-trace] details[open] > summary [data-trace-toggle]::before {
+  content: "−";
+}
+
+/* Draw-in: an armed bar grows from its origin-left edge — a span being
+   traced — 550ms ease-out, each row delayed by its --i index × 70ms so the
+   waterfall composes top-to-bottom. The hidden side reads the shared reveal
+   observer's [data-inview] off the row (lib/motion/reveal.ts); once set it
+   never unsets, so the draw plays exactly once. */
+[data-trace][data-armed] [data-trace-bar] {
+  transform-origin: left center;
+  transition: transform 550ms ease-out;
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+
+[data-trace][data-armed] [data-reveal]:not([data-inview]) [data-trace-bar] {
+  transform: scaleX(0);
+}
+
+/* Belt, as everywhere on this page: preferences can change mid-session and
+   attributes can outlive their gate — under reduced motion the bars are full
+   and inert, and nothing transitions. The layout itself never depends on
+   motion: rows are plain flow and the details disclosure stays open-friendly,
+   so there is no geometry to undo. */
+@media (prefers-reduced-motion: reduce) {
+  [data-trace] [data-trace-bar] {
+    transform: none !important;
+    transition: none !important;
+  }
+}
