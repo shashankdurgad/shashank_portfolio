@@ -1,9 +1,17 @@
 import { PROFILE } from "@/content/profile";
 
+/*
+ * Merge note: `CopyEmail` (another agent's, P2b) wires in here — once
+ * components/CopyEmail.tsx exists, import it and render it beside the Email
+ * link so a visitor can take the address without a mail client opening.
+ */
 const LINKS = [
   { href: `mailto:${PROFILE.email}`, label: "Email", external: false },
   { href: PROFILE.github, label: "GitHub", external: true },
   { href: PROFILE.linkedin, label: "LinkedIn", external: true },
+  // The résumé carries what the page deliberately omits (phone, module
+  // grades), so it is a link here rather than content on the page.
+  { href: PROFILE.resume, label: "Résumé", external: false },
 ];
 
 export function Footer() {
