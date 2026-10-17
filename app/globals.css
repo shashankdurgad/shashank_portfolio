@@ -7,13 +7,64 @@
  * off-white swap, and everything else is expressed as a layer on top of whichever
  * is active. Only `--accent` holds its hue across both, because it marks awards
  * and it should mean the same thing in either.
+ *
+ * `--color-signal` is the one new colour: a cold blue for focus rings, progress
+ * heads and the active nav link. Unlike accent it *is* theme-dependent — the
+ * light pair inverts rather than persists, because a pale blue has no contrast
+ * on off-white and the whole point is legible attention, not hue loyalty.
  */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
+  /*
+   * next/font wires the raw faces (--font-inter, --font-instrument-serif,
+   * --font-jetbrains-mono) in layout.tsx; these aliases are what components
+   * consume, so swapping a face never touches a component. The raw names
+   * deliberately differ from the alias keys: had the serif been wired as
+   * `--font-display` too, the alias below would self-reference and CSS would
+   * resolve it to nothing.
+   */
+  --font-display: var(--font-instrument-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo,
+    monospace;
+
+  /* Hero-scale type (plan §1). Components reach it as `text-display`. */
+  --text-display: clamp(3.25rem, 7.5vw, 5.25rem);
+  --text-display--line-height: 0.95;
+  --text-display--letter-spacing: -0.02em;
+
   /* Amber. The single accent — used for award badges and nothing else, so it
      keeps its weight. */
   --color-accent: #d99a2b;
+
+  /* Named derivations so award surfaces stop inlining the same color-mix. */
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-accent-medium: color-mix(
+    in srgb,
+    var(--color-accent) 28%,
+    transparent
+  );
+
+  /* Signal, dark value. :root boots dark, so this is the default; the light
+     blocks below override, and Tailwind utilities (text-signal, bg-signal…)
+     read the var at use time, so they follow whichever theme is active. */
+  --color-signal: #8fb8d9;
+}
+
+/*
+ * The scroll-progress variable shared by every scroll-driven widget (Header's
+ * document line, the Timeline rail, portrait dissolve later).
+ *
+ * Registered as a real <number> so it is animatable/interpolable and never
+ * string-concatenated by accident. initial-value 0 means "no progress" is the
+ * default everywhere; a widget whose server-rendered end state differs (the
+ * Timeline rail draws full) must set --p explicitly in its markup, because with
+ * a registered property a fallback in var(--p, 1) would never fire.
+ */
+@property --p {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
 }
 
 @layer base {
@@ -26,6 +77,20 @@
     --fg-faint: #6e6e76;
     --line: #26262a;
     --line-strong: #35353b;
+
+    /* E3 floating surfaces (nav sheet, toast): the background itself, mostly
+       opaque, with whatever sits under it doing the rest via backdrop-blur. */
+    --bg-overlay: color-mix(in srgb, var(--bg) 88%, transparent);
+
+    /* Elevation language: E2 is a raised card, E3 a floating sheet. Both are
+       per-theme because a white hairline-inset highlight is a dark-theme-only
+       illusion — on off-white it reads as a mistake. */
+    --shadow-e2: inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --shadow-e3: inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 24px 56px -16px rgb(0 0 0 / 0.7);
+
+    --color-signal: #8fb8d9;
     color-scheme: dark;
   }
 
@@ -47,6 +112,12 @@
       --fg-faint: #8a8a94;
       --line: #e4e4df;
       --line-strong: #d2d2cc;
+      --bg-overlay: color-mix(in srgb, var(--bg) 88%, transparent);
+      --shadow-e2: 0 1px 2px rgb(22 22 26 / 0.05),
+        0 12px 32px -16px rgb(22 22 26 / 0.12);
+      --shadow-e3: 0 2px 4px rgb(22 22 26 / 0.05),
+        0 24px 48px -16px rgb(22 22 26 / 0.18);
+      --color-signal: #2c5f85;
       color-scheme: light;
     }
   }
@@ -60,6 +131,12 @@
     --fg-faint: #8a8a94;
     --line: #e4e4df;
     --line-strong: #d2d2cc;
+    --bg-overlay: color-mix(in srgb, var(--bg) 88%, transparent);
+    --shadow-e2: 0 1px 2px rgb(22 22 26 / 0.05),
+      0 12px 32px -16px rgb(22 22 26 / 0.12);
+    --shadow-e3: 0 2px 4px rgb(22 22 26 / 0.05),
+      0 24px 48px -16px rgb(22 22 26 / 0.18);
+    --color-signal: #2c5f85;
     color-scheme: light;
   }
 
@@ -72,6 +149,12 @@
     --fg-faint: #6e6e76;
     --line: #26262a;
     --line-strong: #35353b;
+    --bg-overlay: color-mix(in srgb, var(--bg) 88%, transparent);
+    --shadow-e2: inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 8px 24px -12px rgb(0 0 0 / 0.6);
+    --shadow-e3: inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 24px 56px -16px rgb(0 0 0 / 0.7);
+    --color-signal: #8fb8d9;
     color-scheme: dark;
   }
 
@@ -94,13 +177,31 @@
   }
 
   ::selection {
+    /* Selection stays amber even though focus rings moved off it: a selection
+       is content the visitor chose, which is closer to "awarded" than to
+       "interface attention", and it only ever paints a few words. */
     background: color-mix(in srgb, var(--color-accent) 26%, transparent);
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    /*
+     * Signal, not accent.
+     *
+     * Amber means "award" and nothing else; a focus ring in amber asked it to
+     * mean two things at once. The blue is tuned for contrast in both themes,
+     * which is the job a focus ring actually has.
+     */
+    outline: 2px solid var(--color-signal);
     outline-offset: 2px;
     border-radius: 2px;
+  }
+
+  /*
+   * A modal <dialog>'s veil, tinted with the active --bg rather than the UA
+   * black, so light mode dims to parchment instead of to soot.
+   */
+  dialog::backdrop {
+    background: color-mix(in srgb, var(--bg) 70%, transparent);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -116,11 +217,41 @@
 }
 
 /*
+ * Theme-toggle view transition.
+ *
+ * ThemeToggle wraps the data-theme write in document.startViewTransition() and
+ * places the centre/radius of the reveal as --vt-* on the root. The old snapshot
+ * is frozen (animation: none) so the new paint wipes over it through a growing
+ * circle instead of cross-fading. Browsers without view transitions never match
+ * these selectors; the JS feature-detection makes that the whole contract.
+ *
+ * Under reduced motion the component skips the transition outright, and the
+ * global block above would flatten the wipe anyway — belt and braces.
+ */
+@keyframes theme-wipe {
+  from {
+    clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--vt-r, 150%) at var(--vt-x, 50%) var(--vt-y, 50%));
+  }
+}
+
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  animation: theme-wipe 350ms ease-out both;
+}
+
+/*
  * Semantic utilities.
  *
  * The tokens above are plain custom properties rather than @theme colours, so
  * they do not generate Tailwind classes on their own. These few shorthands cover
- * what the page actually reaches for.
+ * what the page actually reaches for. (text-signal and friends *do* exist: they
+ * come from --color-signal living in the @theme colour namespace.)
  */
 @utility bg-surface {
   background-color: var(--bg);
@@ -130,6 +261,9 @@
 }
 @utility bg-inset {
   background-color: var(--bg-inset);
+}
+@utility bg-overlay {
+  background-color: var(--bg-overlay);
 }
 @utility text-fg {
   color: var(--fg);
@@ -145,4 +279,43 @@
 }
 @utility border-line-strong {
   border-color: var(--line-strong);
+}
+@utility shadow-e2 {
+  box-shadow: var(--shadow-e2);
+}
+@utility shadow-e3 {
+  box-shadow: var(--shadow-e3);
+}
+
+/*
+ * Scroll reveal.
+ *
+ * Same arm-after-mount contract as everything else: server HTML is the finished,
+ * readable end state — an element is fully painted unless an armed ancestor (or
+ * the element itself) says motion is live *and* the shared observer in
+ * lib/motion/reveal.ts has not tagged it [data-inview] yet. JS-off, RM and
+ * pre-hydration all see the final state, never the hidden one.
+ *
+ * Mark up as `class="reveal"` + `data-reveal` (the attribute is the observer's
+ * selector); stagger with an inline `--i` index where a group lands together.
+ *
+ * Written as flat rules rather than an @utility with nesting: the ancestor form
+ * of the hidden-state selector needs `&` in a non-leading position, which
+ * Tailwind hands to the browser unparsed — on a slightly older engine that
+ * quietly drops the rule and the whole utility stops doing anything. Flat
+ * selectors behave identically everywhere.
+ */
+@layer utilities {
+  .reveal {
+    transition:
+      opacity 500ms ease-out,
+      transform 500ms ease-out;
+    transition-delay: calc(var(--i, 0) * 60ms);
+  }
+
+  .reveal[data-armed]:not([data-inview]),
+  [data-armed] .reveal:not([data-inview]) {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }

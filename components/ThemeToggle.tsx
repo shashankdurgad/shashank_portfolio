@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 
 export type Theme = "light" | "dark";
 
@@ -48,7 +49,15 @@ function MoonIcon() {
  * pre-paint script above may already have set it, and the toggle writes to it
  * directly. Subscribing to it keeps this component reflecting reality instead of
  * holding a second, divergent copy.
+ *
+ * The custom event exists for the view-transition path below: a MutationObserver
+ * callback lands as a microtask, which is *after* startViewTransition has
+ * captured the new snapshot, so the icon swap would miss the wipe and pop in
+ * when it ends. Dispatching the listener synchronously inside the callback and
+ * flushing it lets the snapshot catch the new icon too.
  */
+const THEME_EVENT = "theme-change";
+
 function subscribe(onChange: () => void) {
   const observer = new MutationObserver(onChange);
   observer.observe(document.documentElement, {
@@ -57,9 +66,11 @@ function subscribe(onChange: () => void) {
   });
   const scheme = window.matchMedia("(prefers-color-scheme: light)");
   scheme.addEventListener("change", onChange);
+  document.addEventListener(THEME_EVENT, onChange);
   return () => {
     observer.disconnect();
     scheme.removeEventListener("change", onChange);
+    document.removeEventListener(THEME_EVENT, onChange);
   };
 }
 
@@ -73,9 +84,9 @@ export function ThemeToggle() {
   // The server cannot know the visitor's theme, so it renders no icon at all
   // rather than guessing and hydrating mismatched.
   const theme = useSyncExternalStore(subscribe, getSnapshot, () => undefined);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
-  function toggle() {
-    const next: Theme = theme === "light" ? "dark" : "light";
+  function applyTheme(next: Theme) {
     // Write to the DOM only — the store subscription above picks the change up
     // and re-renders. Keeping a useState copy in step with this would be a
     // second source of truth for no gain.
@@ -88,8 +99,55 @@ export function ThemeToggle() {
     }
   }
 
+  function toggle() {
+    if (!theme) return; // nothing to flip until the store has resolved a theme
+    const next: Theme = theme === "light" ? "dark" : "light";
+
+    // Feature-detected view transition (plan §1) with a circular clip wipe
+    // growing from the button, 350ms (the keyframes live in globals.css).
+    // Reduced motion takes the instant path — and the global RM block would
+    // flatten the wipe anyway.
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => void) => unknown;
+    };
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!doc.startViewTransition || reduce) {
+      applyTheme(next);
+      return;
+    }
+
+    const root = document.documentElement;
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) {
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      // The circle must clear the farthest corner by the time it ends, or the
+      // wipe visibly stops mid-screen.
+      const r = Math.hypot(
+        Math.max(cx, root.clientWidth - cx),
+        Math.max(cy, root.clientHeight - cy),
+      );
+      root.style.setProperty("--vt-x", `${cx}px`);
+      root.style.setProperty("--vt-y", `${cy}px`);
+      root.style.setProperty("--vt-r", `${r}px`);
+    }
+    // The --vt-* properties deliberately stay set: harmless, and overwritten
+    // at the start of the next toggle.
+
+    doc.startViewTransition(() => {
+      applyTheme(next);
+      // Render subscribers synchronously so the new snapshot includes the
+      // swapped icon. The MutationObserver will fire again as a microtask;
+      // useSyncExternalStore compares snapshots, sees no change, and skips.
+      flushSync(() => {
+        document.dispatchEvent(new Event(THEME_EVENT));
+      });
+    });
+  }
+
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={toggle}
       aria-label={theme ? `Switch to ${theme === "light" ? "dark" : "light"} theme` : "Switch theme"}
