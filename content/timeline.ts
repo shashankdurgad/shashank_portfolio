@@ -94,7 +94,6 @@ export const TIMELINE: TimelineEntry[] = [
     place: "London",
     line: "Predicted First · IMDA SG Digital Scholar",
     points: [
-      "Year 1: 69.5% average — top marks in Engineering Challenges (80.9) and Theory of Computation (77.0).",
       "Foundry Labs Cohort 4 · Bloomsbury Startup Academy · P&G Insight Week.",
     ],
   },
