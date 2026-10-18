@@ -10,6 +10,8 @@
  */
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Metadata voice: dates, labels, stack, graph annotations. Prose stays sans. */
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   /* Amber. The single accent — used for award badges and nothing else, so it
      keeps its weight. */
@@ -88,8 +90,13 @@
     overflow-x: clip;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   /* Anchors sit under a sticky header; without this they land beneath it. */
-  section[id] {
+  section[id],
+  article[id] {
     scroll-margin-top: 5.5rem;
   }
 
@@ -145,4 +152,13 @@
 }
 @utility border-line-strong {
   border-color: var(--line-strong);
+}
+@utility text-accent {
+  color: var(--color-accent);
+}
+@utility bg-accent-soft {
+  background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+@utility border-accent-soft {
+  border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
 }

@@ -1,8 +1,5 @@
 /**
- * Skills, grouped.
- *
- * Transcribed from v1/CONTENT.md, which held these as prose after the resume
- * sections were removed.
+ * Skills for the About section.
  */
 
 export type SkillGroup = {
@@ -15,39 +12,16 @@ export const SKILLS: SkillGroup[] = [
   {
     id: "languages",
     label: "Languages",
-    items: ["Python", "TypeScript", "Swift", "Java", "C/C++", "SQL", "HTML/CSS"],
+    items: ["Python", "TypeScript", "Swift", "Java", "C/C++", "SQL"],
   },
   {
     id: "aiml",
     label: "AI / ML",
-    items: [
-      "LangGraph",
-      "LangChain",
-      "PyTorch",
-      "Scikit-learn",
-      "XGBoost",
-      "pandas",
-      "NumPy",
-      "OpenCV",
-      "MediaPipe",
-    ],
+    items: ["LangGraph", "PyTorch", "vLLM", "scikit-learn", "OpenCV", "RAG", "Vertex AI", "Jetson"],
   },
   {
-    id: "tools",
-    label: "Frameworks & Tools",
-    items: [
-      "Next.js",
-      "React",
-      "FastAPI",
-      "Django",
-      "SQLite",
-      "PostgreSQL",
-      "NetworkX",
-      "Docker",
-      "Playwright",
-      "OpenTelemetry",
-      "Git",
-      "Figma",
-    ],
+    id: "infra",
+    label: "Build",
+    items: ["Next.js", "React", "FastAPI", "Django", "PostgreSQL", "Docker", "OpenTelemetry", "Playwright"],
   },
 ];
