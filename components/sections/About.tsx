@@ -21,7 +21,7 @@ export function About() {
             <dl className="space-y-5 text-sm">
               <div className="grid grid-cols-[7rem_1fr] gap-4">
                 <dt className="font-mono text-xs text-faint">degree</dt>
-                <dd>BSc CS, UCL · Predicted First · IMDA SG Digital Scholar</dd>
+                <dd>BSc CS, UCL · Predicted First</dd>
               </div>
               <div className="grid grid-cols-[7rem_1fr] gap-4">
                 <dt className="font-mono text-xs text-faint">school</dt>

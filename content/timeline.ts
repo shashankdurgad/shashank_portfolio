@@ -92,7 +92,7 @@ export const TIMELINE: TimelineEntry[] = [
     org: "University College London",
     role: "BSc Computer Science",
     place: "London",
-    line: "Predicted First · IMDA SG Digital Scholar",
+    line: "Predicted First Class Honours",
     points: [
       "Foundry Labs Cohort 4 · Bloomsbury Startup Academy · P&G Insight Week.",
     ],
