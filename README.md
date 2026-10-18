@@ -1,13 +1,30 @@
 # shashank_portfolio
 
-## v2 (active)
+## v3 (active)
 
-The live project lives at the repo root. Next.js 16, React 19, Tailwind 4.
+Next.js 16, React 19, Tailwind 4. One page: hero → work → projects → about → contact.
 
 ```bash
 npm install
 npm run dev
 ```
+
+**Content lives in `content/`** — profile, timeline, projects, skills. Every
+section reads from there, as do the OG card and JSON-LD, so editing a fact means
+editing one file. Copy is held to a budget: one line per item, at most two
+points when expanded.
+
+- **Work** is a commit graph (`components/work/`): each role is a branch that
+  forks off its lane and merges back when it ends; ongoing ones stay open at
+  `HEAD`. Overlaps are computed from the `start`/`end` months.
+- **Projects** has four featured cards with a headline metric and a generative
+  emblem each, then an index of the rest.
+- Amber is reserved for awards. Mono is the metadata voice; prose stays sans.
+- `app/opengraph-image.tsx` and `app/icon.tsx` are generated at build time.
+
+CI (`.github/workflows/ci.yml`) runs typegen, tsc, lint and build.
+
+## v2 notes (still relevant)
 
 ### The portrait
 

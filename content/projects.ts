@@ -1,71 +1,124 @@
 /**
- * Projects, newest first.
+ * Projects, in two tiers.
  *
- * Carried over from v1/lib/projectData.ts. The naming question recorded in
- * v1/CONTENT.md — whether the compliance project is AIEngine or Sentrix — was
- * settled there by the repository being `w3joe/sentrix`, and stays settled.
+ * Featured projects get a card with a headline metric; the rest are one row in
+ * an index. Within each tier, newest first.
+ *
+ * Naming: the CV calls the compliance project "AIEngine", but the repository
+ * is `w3joe/sentrix` and the site has always used Sentrix — that stays. Onflow
+ * links to its GitHub org and nothing else.
  */
 
 export type Project = {
   id: string;
   name: string;
-  summary: string;
   period: string;
-  award: string;
-  detail: string[];
+  /** One line. What it is, not how it was built. */
+  line: string;
+  /** The single number worth remembering, and what it measures. */
+  metric?: { value: string; label: string };
+  award?: string;
+  /** At most two, each under ~20 words. */
+  points: string[];
   stack: string[];
-  /**
-   * Repository. Several sit under a collaborator's account or an org rather than
-   * a personal one — these were team projects, and the link points at where the
-   * work actually lives.
-   */
-  repo: string;
-  paper?: string;
+  links: { label: string; href: string }[];
 };
 
-export const PROJECTS: Project[] = [
+export const FEATURED: Project[] = [
+  {
+    id: "buildapolicy",
+    name: "BuildAPolicy",
+    period: "Sep 2026",
+    line: "Turns two human demonstrations into a vision-language robot policy",
+    metric: { value: "~800", label: "verified episodes / hour from 2 demos" },
+    points: [
+      "Webcam teleoperation of a Franka FR3 with a five-finger hand; a replay gate keeps only lift-and-hold successes.",
+      "Daytona runs 289 parallel replays to map where demos succeed, widening the robust region from 5 mm to 25 mm.",
+    ],
+    stack: ["Python", "Computer Vision", "Robotics Sim", "Synthetic Data"],
+    links: [{ label: "GitHub", href: "https://github.com/shashankdurgad/buildapolicy" }],
+  },
   {
     id: "sentinel",
     name: "Sentinel",
-    summary: "Autonomous agents negotiating satellite collision avoidance",
     period: "Mar 2026",
-    award: "Environment Track — NVIDIA GTC Hack for Impact",
-    detail: [
-      "A decentralised system where autonomous agents negotiate satellite collision avoidance manoeuvres in seconds, reducing debris cascades.",
-      "Dual-path collision risk classifier pairing rule-based thresholds with an XGBoost model (8 features, 4 risk classes) to capture compound interactions beyond hard rules.",
-      "Real-time feature extraction from live CelesTrak conjunction data and NOAA space weather feeds.",
+    line: "Nemotron agents that negotiate satellite collision avoidance",
+    metric: { value: "2", label: "live feeds — CelesTrak conjunctions + NOAA space weather" },
+    award: "1st · NVIDIA GTC Hack for Impact",
+    points: [
+      "Rules + XGBoost risk classifier (8 features, 4 classes) on live CelesTrak and NOAA space-weather feeds.",
+      "RAG over past incidents so agents negotiate with precedent.",
     ],
-    stack: ["Python", "XGBoost", "NumPy", "FastAPI", "Pydantic"],
-    repo: "https://github.com/desmondzee/sentinel",
+    stack: ["Python", "XGBoost", "FastAPI", "Nemotron"],
+    links: [{ label: "GitHub", href: "https://github.com/desmondzee/sentinel" }],
   },
   {
     id: "sentrix",
     name: "Sentrix",
-    summary: "Multi-agent compliance monitoring with a patrol swarm",
     period: "Feb – Mar 2026",
-    award: "1st Place — UCL BUILD AI Festival",
-    detail: [
-      "A multi-agent AI compliance monitoring system, built around a patrol swarm that escalates findings through a staged investigation pipeline.",
-      "LangGraph and NVIDIA Nemotron drive the swarm using pheromone-based sampling and quorum voting.",
-      "A 4-stage investigation pipeline fed by an ETL layer ingesting A2A messages, emails, PRs and documents into SQLite, backed by NetworkX for inter-agent graph analysis.",
+    line: "A patrol swarm of agents that polices other agents for compliance",
+    metric: { value: "4-stage", label: "investigation behind a quorum-voting swarm" },
+    award: "1st · UCL BUILD AI Festival",
+    points: [
+      "LangGraph + Nemotron swarm with pheromone sampling and quorum voting feeds a 4-stage investigation.",
+      "ETL into SQLite, NetworkX for inter-agent graphs, streamed live over SSE.",
     ],
-    stack: ["Python", "LangGraph", "SQLite", "NetworkX", "FastAPI"],
-    repo: "https://github.com/w3joe/sentrix",
+    stack: ["LangGraph", "NetworkX", "FastAPI", "React"],
+    links: [{ label: "GitHub", href: "https://github.com/w3joe/sentrix" }],
   },
   {
     id: "onflow",
     name: "Onflow",
-    summary: "Simulated agentic web use, turned into UX feedback",
     period: "Oct 2025 – Jul 2026",
-    award: "1st Place — Bloomsbury Startup Academy Demo Day",
-    detail: [
-      "An agentic platform that simulates real user behaviour against a live product and turns the traces into actionable UX feedback and codegen fixes.",
-      "LangChain drives the agents, Playwright drives the browser, and the GitHub API and Gemini CLI close the loop with automated fixes.",
-      "Synthetic automated user testing drove a 30% conversion rate in preliminary beta.",
-      "2nd Place at the Gemini 3 London Hackathon, judged by Google; shortlisted for the Google AI Futures Fund interview.",
+    line: "Browser agents with personas that UX-test your product and open the fix",
+    metric: { value: "30%", label: "beta conversion" },
+    award: "1st · Bloomsbury Demo Day",
+    points: [
+      "2nd at Gemini 3 London (USD 30k GCP credits); shortlisted for Google AI Futures Fund.",
+      "LangChain + Playwright agents; GitHub API and Gemini CLI generate the patches.",
     ],
-    stack: ["Next.js", "GitHub API", "Playwright", "LangChain", "Gemini CLI"],
-    repo: "https://github.com/Onflow-AI",
-    paper: "https://arxiv.org/abs/2604.09581",
+    stack: ["Next.js", "LangChain", "Playwright", "Gemini"],
+    links: [{ label: "GitHub", href: "https://github.com/Onflow-AI" }],
+  },
+];
+
+export const INDEX: Project[] = [
+  {
+    id: "avenir",
+    name: "Avenir-UX",
+    period: "Dec 2025 – Jun 2026",
+    line: "Research: pixel-grounded usability scoring (SUS, SEQ) with computer-use agents",
+    award: "Published · arXiv",
+    points: [],
+    stack: ["Computer-use agents", "HCI"],
+    links: [{ label: "Paper", href: "https://arxiv.org/abs/2604.09581" }],
+  },
+  {
+    id: "smartbell",
+    name: "SmartBell",
+    period: "Mar 2026",
+    line: "Offline-first workout tracker with on-device progressive overload",
+    points: [],
+    stack: ["React", "TypeScript", "IndexedDB"],
+    links: [{ label: "GitHub", href: "https://github.com/shashankdurgad/SmartBell" }],
+  },
+  {
+    id: "first-global",
+    name: "FIRST Global Challenge",
+    period: "2021",
+    line: "Computer-vision smart bin, built with Team Iran for Team Singapore",
+    award: "2nd globally · Environment",
+    points: [],
+    stack: ["Computer Vision", "Robotics"],
+    links: [],
+  },
+  {
+    id: "tasko",
+    name: "Tasko",
+    period: "2019 – 2021",
+    line: "Eisenhower-matrix task app for students, shipped to the App Store",
+    points: [],
+    stack: ["Swift"],
+    links: [],
   },
 ];

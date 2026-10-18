@@ -16,13 +16,16 @@ const PERSON_LD = {
   "@context": "https://schema.org",
   "@type": "Person",
   name: PROFILE.name,
-  description: PROFILE.blurb,
+  description: PROFILE.description,
   email: `mailto:${PROFILE.email}`,
   address: { "@type": "PostalAddress", addressLocality: "London", addressCountry: "GB" },
-  url: PROFILE.github,
+  url: PROFILE.site,
   sameAs: [PROFILE.github, PROFILE.linkedin],
   knowsAbout: PROFILE.interests,
-  alumniOf: { "@type": "CollegeOrUniversity", name: "University College London" },
+  alumniOf: [
+    { "@type": "CollegeOrUniversity", name: "University College London" },
+    { "@type": "HighSchool", name: "Anglo-Chinese School (Independent)" },
+  ],
 };
 
 export default function Home() {

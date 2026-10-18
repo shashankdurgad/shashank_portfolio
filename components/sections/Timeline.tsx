@@ -1,179 +1,183 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { TIMELINE } from "@/content/timeline";
-import { Chip } from "@/components/ui/Chip";
+import { TIMELINE, type Month } from "@/content/timeline";
+import { AwardTag, Chip } from "@/components/ui/Chip";
+import { GraphCell } from "@/components/work/GraphCell";
+import { HEAD_H, layout } from "@/components/work/graph";
 
 /**
- * The timeline rail.
+ * The commit graph: `git log --graph` over work, study and societies.
  *
- * A single line runs down the left with a node per entry. The line is drawn in
- * two layers: a static track at low contrast, and a bright progress line on top
- * whose height follows scroll position, so it appears to draw itself downward as
- * the section passes through the viewport.
+ * Text is a list of entries, each a git-log line that opens into its detail.
+ * The graph is drawn one row at a time beside it (see GraphCell for why).
  *
- * Progress is measured against the rail's own geometry rather than the section's,
- * so the line reaches the last node exactly when that node is read — tying it to
- * the section box instead leaves the line short by the height of the final card.
+ * The draw-in reveals each row's slice bottom-up with a clip-path, oldest
+ * first, so history appears to grow towards HEAD. A stroke-dashoffset draw
+ * would be the obvious technique, but it needs the dash array to itself, and
+ * two of the three lanes already use theirs for their line style.
  */
 
-/** Where in the viewport a node counts as "reached", as a fraction of height. */
-const TRIGGER = 0.72;
+function range(start: Month, end: Month | null) {
+  return `${start} → ${end ?? "now"}`;
+}
 
-export function Timeline() {
-  const railRef = useRef<HTMLOListElement>(null);
+export function Timeline({ asOf }: { asOf: Month }) {
+  const graph = layout(TIMELINE, asOf);
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState<string | null>(graph.rows[0]?.id ?? null);
+  const [active, setActive] = useState<string | null>(null);
 
   /*
-   * Everything starts fully revealed, and the scroll animation is opted into
-   * after mount.
+   * The server renders the drawn end state, and arming only ever takes things
+   * away from it — if this effect never runs, the graph is simply there.
    *
-   * This ordering is deliberate and both halves matter. Reading matchMedia in a
-   * state initialiser desynchronises server and client — the server has no
-   * matchMedia, so it renders the animated-from state while a reduced-motion
-   * client initialises to the final one, and React reports a hydration
-   * mismatch. And starting hidden means that if the effect never runs — JS
-   * disabled, a hydration error, reduced motion taking an early return — the
-   * content stays invisible, which is a far worse failure than not animating.
-   *
-   * So: the server-rendered HTML is the readable end state, and arming only ever
-   * takes things away from it.
+   * It also only arms when the graph is still below the fold. Hiding something
+   * the visitor is already looking at, just to animate it back, reads as a
+   * flicker rather than an entrance.
    */
-  const [progress, setProgress] = useState(1);
-  // Index of the last node the progress line has passed.
-  const [reached, setReached] = useState(TIMELINE.length - 1);
-
   useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
+    const el = ref.current;
+    if (!el) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (el.getBoundingClientRect().top < window.innerHeight) return;
 
-    // Arming is a class on the DOM node, not React state. It only ever gates CSS
-    // transitions, so routing it through state would buy nothing and cost a
-    // render — and setting state synchronously in an effect is exactly the
-    // cascading-render pattern the lint rule exists to catch.
-    rail.dataset.armed = "true";
-
-    let raf = 0;
-
-    function update() {
-      raf = 0;
-      const el = railRef.current;
-      if (!el) return;
-
-      const rect = el.getBoundingClientRect();
-      const line = window.innerHeight * TRIGGER;
-      // How far the trigger line has travelled down the rail, 0..1.
-      const p = (line - rect.top) / Math.max(rect.height, 1);
-      setProgress(Math.min(Math.max(p, 0), 1));
-
-      // Which nodes sit above the trigger line. Measured from the nodes
-      // themselves so the reveal stays in step with the drawn line even as
-      // cards change height across breakpoints.
-      const nodes = el.querySelectorAll<HTMLElement>("[data-node]");
-      let last = -1;
-      nodes.forEach((node, i) => {
-        if (node.getBoundingClientRect().top < line) last = i;
-      });
-      setReached(last);
-    }
-
-    function onScroll() {
-      // Coalesce to one update per frame: scroll fires far more often, and each
-      // update writes state that re-renders the list.
-      if (!raf) raf = requestAnimationFrame(update);
-    }
-
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
+    el.dataset.phase = "armed";
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        el.dataset.phase = "drawn";
+        io.disconnect();
+      },
+      { threshold: 0.15 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
 
+  const n = graph.rows.length;
+
+  // The reveal wrapper around each row's graph. Delays run bottom-up.
+  const reveal =
+    "flex self-stretch [clip-path:inset(0)] transition-[clip-path] duration-500 ease-out in-data-[phase=armed]:[clip-path:inset(100%_0_0_0)]";
+
+  function cells(row: number) {
+    return (
+      <div className={reveal} style={{ transitionDelay: `${(n - row) * 90}ms` }}>
+        <GraphCell graph={graph} row={row} gap={13} active={active} className="sm:hidden" />
+        <GraphCell graph={graph} row={row} gap={20} active={active} className="hidden sm:block" />
+      </div>
+    );
+  }
+
   return (
-    <ol ref={railRef} className="relative">
-      {/* Static track. Inset to sit under the node centres. */}
-      <div
-        aria-hidden="true"
-        className="absolute top-2 bottom-2 left-1.25 w-px bg-(--line) sm:left-37.25"
-      />
-      {/* Progress line, drawn on top. */}
-      <div
-        aria-hidden="true"
-        className="absolute top-2 left-1.25 w-px origin-top bg-(--fg-muted) transition-none sm:left-37.25 in-data-armed:transition-[height] in-data-armed:duration-[120ms] in-data-armed:ease-linear"
-        style={{
-          height: `calc((100% - 1rem) * ${progress})`,
-        }}
-      />
+    <div ref={ref}>
+      {/* HEAD strip: where the open branches end. */}
+      <div className="flex" style={{ height: HEAD_H }}>
+        <span className="hidden w-12 shrink-0 sm:block" />
+        {cells(-1)}
+        <p className="pl-3 font-mono text-xs leading-[20px] text-faint">
+          HEAD <span className="opacity-60">→</span> now
+        </p>
+      </div>
 
-      {TIMELINE.map((entry, i) => {
-        const active = i <= reached;
-        return (
-          <li
-            key={entry.id}
-            className="relative grid gap-x-8 gap-y-2 pb-10 pl-8 last:pb-0 sm:grid-cols-[9rem_1fr] sm:pl-0"
-          >
-            {/* Period column. On mobile it sits above the role instead. */}
-            <div className="sm:text-right sm:pr-8">
-              <p className="text-sm text-muted">{entry.period}</p>
-              <p className="mt-0.5 text-xs text-faint">{entry.location}</p>
-            </div>
+      <ol>
+        {graph.rows.map((e, i) => {
+          const expandable = Boolean(e.points?.length || e.stack?.length);
+          const isOpen = expandable && open === e.id;
+          const newYear = i === 0 || graph.rows[i - 1].year !== e.year;
 
-            {/* Node. Filled for work, hollow for education — the distinction is
-                carried by shape rather than colour so it survives both themes. */}
-            <span
-              data-node
-              aria-hidden="true"
-              className={[
-                "absolute top-1.5 left-0 size-2.75 rounded-full border sm:left-36 in-data-armed:transition-all in-data-armed:duration-500",
-                entry.kind === "work"
-                  ? "border-(--fg) bg-(--fg)"
-                  : "border-(--fg-muted) bg-surface",
-                active ? "scale-100 opacity-100" : "scale-75 opacity-35",
-              ].join(" ")}
-            />
-
-            <div
-              className="in-data-armed:transition-all in-data-armed:duration-500 in-data-armed:ease-out"
-              style={{
-                opacity: active ? 1 : 0,
-                transform: active ? "none" : "translateY(12px)",
-                // Stagger within a card only — entries are already staggered by
-                // arriving at the trigger line at different times.
-                transitionDelay: active ? "60ms" : "0ms",
-              }}
-            >
-              <h3 className="font-medium">
-                {entry.role}
+          const head = (
+            <>
+              <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-xs leading-4">
+                <span className="text-muted">{e.hash}</span>
+                <span className="text-faint">{range(e.start, e.end)}</span>
+                {e.tags?.map((t) => <AwardTag key={t}>{t}</AwardTag>)}
+                {expandable && (
+                  <span aria-hidden="true" className="ml-auto text-faint transition-colors group-hover:text-fg">
+                    {isOpen ? "[−]" : "[+]"}
+                  </span>
+                )}
+              </span>
+              <span className="mt-2 block font-medium tracking-[-0.01em]">
+                {e.role}
                 <span className="text-faint"> · </span>
-                <span className="text-muted">{entry.org}</span>
-              </h3>
+                <span className="text-muted">{e.org}</span>
+              </span>
+              <span className="mt-1 block text-sm leading-relaxed text-muted">{e.line}</span>
+            </>
+          );
 
-              <ul className="mt-3 space-y-2">
-                {entry.detail.map((line) => (
-                  <li
-                    key={line}
-                    className="text-sm leading-relaxed text-muted before:mr-2 before:text-faint before:content-['—']"
+          return (
+            <li
+              key={e.id}
+              className="flex"
+              onMouseEnter={() => setActive(e.id)}
+              onMouseLeave={() => setActive(null)}
+              onFocus={() => setActive(e.id)}
+              onBlur={() => setActive(null)}
+            >
+              {/* Year gutter: only where the year changes, like a log's date
+                  separators. On phones the date in the line carries it. */}
+              <span className="hidden w-12 shrink-0 pt-3.5 font-mono text-xs leading-4 text-faint sm:block">
+                {newYear ? e.year : ""}
+              </span>
+
+              {cells(i)}
+
+              <div className="min-w-0 flex-1 pb-7 pl-3">
+                {expandable ? (
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={`tl-${e.id}`}
+                    onClick={() => setOpen(isOpen ? null : e.id)}
+                    className="group block w-full rounded-md pt-3.5 text-left"
                   >
-                    {line}
-                  </li>
-                ))}
-              </ul>
+                    {head}
+                  </button>
+                ) : (
+                  <div className="pt-3.5">{head}</div>
+                )}
 
-              {entry.stack && (
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {entry.stack.map((s) => (
-                    <Chip key={s}>{s}</Chip>
-                  ))}
-                </div>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+                {expandable && (
+                  // Height animates via the 0fr → 1fr grid-row trick; `inert`
+                  // keeps the collapsed links out of the tab order.
+                  <div
+                    id={`tl-${e.id}`}
+                    inert={!isOpen}
+                    className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+                      isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      {e.points && (
+                        <ul className="mt-3 space-y-1.5">
+                          {e.points.map((p) => (
+                            <li
+                              key={p}
+                              className="text-sm leading-relaxed text-muted before:mr-2 before:text-faint before:content-['—']"
+                            >
+                              {p}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {e.stack && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {e.stack.map((s) => (
+                            <Chip key={s}>{s}</Chip>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

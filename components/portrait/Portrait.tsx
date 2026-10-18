@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import darkData from "@/app/_portrait/portrait-dark.json";
-import lightData from "@/app/_portrait/portrait-light.json";
 
 /**
  * The line-art portrait, with lines that push away from the cursor.
@@ -28,13 +26,25 @@ type PortraitDoc = {
   lines: number[][];
 };
 
-const DOCS: Record<"dark" | "light", PortraitDoc> = {
-  dark: darkData as PortraitDoc,
-  light: lightData as PortraitDoc,
-};
+/**
+ * Canvas size, shared by both geometries — only vertex positions differ.
+ *
+ * Stated here rather than read from the JSON so the canvas can reserve its box
+ * before the geometry arrives. The two files are ~750 KB between them and are
+ * fetched after mount; importing them statically put all of that in the first
+ * load for an image that sits beside the fold.
+ */
+const DOC = { width: 2000, height: 1878 } as const;
 
-/** Canvas size and line topology are shared; only vertex positions differ. */
-const DOC = DOCS.dark;
+function loadDocs() {
+  return Promise.all([
+    import("@/app/_portrait/portrait-dark.json"),
+    import("@/app/_portrait/portrait-light.json"),
+  ]).then(([dark, light]) => ({
+    dark: dark.default as PortraitDoc,
+    light: light.default as PortraitDoc,
+  }));
+}
 
 /** Radius of the cursor's influence, as a fraction of the portrait's width. */
 const REPEL_RADIUS = 0.19;
@@ -143,211 +153,219 @@ export function Portrait({ className }: { className?: string }) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Both variants share line topology and vertex count — only the positions
-    // differ — so `starts` and the buffers are decoded once and a theme change
-    // just copies new rest positions in.
-    const geometry = {
-      dark: decode(DOCS.dark),
-      light: decode(DOCS.light),
-    };
+    let cancelled = false;
+    let teardown: (() => void) | undefined;
 
-    function activeTheme(): "dark" | "light" {
-      const attr = document.documentElement.getAttribute("data-theme");
-      if (attr === "light" || attr === "dark") return attr;
-      return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-    }
+    loadDocs().then((DOCS) => {
+      if (cancelled) return;
 
-    let theme = activeTheme();
-    const { starts, count, spacing } = geometry[theme];
-    const rest = new Float32Array(geometry[theme].rest);
-    const pos = new Float32Array(rest);
-    const vel = new Float32Array(count * 2);
+      // Both variants share line topology and vertex count — only the positions
+      // differ — so `starts` and the buffers are decoded once and a theme change
+      // just copies new rest positions in.
+      const geometry = {
+        dark: decode(DOCS.dark),
+        light: decode(DOCS.light),
+      };
 
-    // Pointer in grid units. Null means "not over the portrait".
-    let px: number | null = null;
-    let py: number | null = null;
-
-    let width = 0;
-    let height = 0;
-    let scale = 1;
-    let raf = 0;
-    let running = false;
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-    function draw() {
-      if (!ctx) return;
-      ctx.clearRect(0, 0, width, height);
-      // currentColor, resolved at draw time — this is what makes the portrait
-      // follow the theme without a second copy of the geometry.
-      ctx.strokeStyle = getComputedStyle(canvas!).color;
-      ctx.lineWidth = Math.max(0.7, scale * 1.15);
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      ctx.beginPath();
-      for (let i = 0; i < starts.length - 1; i++) {
-        const from = starts[i];
-        const to = starts[i + 1];
-        if (to - from < 2) continue;
-        ctx.moveTo(pos[from * 2] * scale, pos[from * 2 + 1] * scale);
-        for (let v = from + 1; v < to; v++) {
-          ctx.lineTo(pos[v * 2] * scale, pos[v * 2 + 1] * scale);
-        }
+      function activeTheme(): "dark" | "light" {
+        const attr = document.documentElement.getAttribute("data-theme");
+        if (attr === "light" || attr === "dark") return attr;
+        return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
       }
-      ctx.stroke();
-    }
 
-    function step() {
-      const radius = REPEL_RADIUS * DOC.width;
-      const strength = REPEL_STRENGTH * spacing;
-      const r2 = radius * radius;
+      let theme = activeTheme();
+      const { starts, count, spacing } = geometry[theme];
+      const rest = new Float32Array(geometry[theme].rest);
+      const pos = new Float32Array(rest);
+      const vel = new Float32Array(count * 2);
 
-      let moving = false;
+      // Pointer in grid units. Null means "not over the portrait".
+      let px: number | null = null;
+      let py: number | null = null;
 
-      for (let v = 0; v < count; v++) {
-        const ix = v * 2;
-        const iy = ix + 1;
+      let width = 0;
+      let height = 0;
+      let scale = 1;
+      let raf = 0;
+      let running = false;
 
-        let ax = 0;
-        let ay = 0;
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-        if (px !== null && py !== null) {
-          // Measured from the vertex's *rest* position, not its current one.
-          //
-          // Using the live position makes the force chase the vertex it is
-          // pushing: the vertex leaves the radius, the force cuts out, the
-          // spring drags it back in, and the zone pumps itself empty. Anchoring
-          // to rest means each vertex has one fixed target offset for a given
-          // cursor position, so the field deforms and holds.
-          const dx = rest[ix] - px;
-          const dy = rest[iy] - py;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < r2 && d2 > 1e-6) {
-            const d = Math.sqrt(d2);
-            // Smooth shoulder: full push near the cursor, easing to nothing at
-            // the rim so there is no visible circular edge.
-            const t = 1 - d / radius;
-            const falloff = t * t * (3 - 2 * t);
-            const amount = strength * falloff;
-            // Target position, then spring toward *that* rather than applying a
-            // raw force. Displacement is bounded by construction, so the bulge
-            // can never open into a crater however long the cursor rests.
-            const tx = rest[ix] + (dx / d) * amount;
-            const ty = rest[iy] + (dy / d) * amount;
-            ax += (tx - pos[ix]) * SPRING;
-            ay += (ty - pos[iy]) * SPRING;
+      function draw() {
+        if (!ctx) return;
+        ctx.clearRect(0, 0, width, height);
+        // currentColor, resolved at draw time — this is what makes the portrait
+        // follow the theme without a second copy of the geometry.
+        ctx.strokeStyle = getComputedStyle(canvas!).color;
+        ctx.lineWidth = Math.max(0.7, scale * 1.15);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        ctx.beginPath();
+        for (let i = 0; i < starts.length - 1; i++) {
+          const from = starts[i];
+          const to = starts[i + 1];
+          if (to - from < 2) continue;
+          ctx.moveTo(pos[from * 2] * scale, pos[from * 2 + 1] * scale);
+          for (let v = from + 1; v < to; v++) {
+            ctx.lineTo(pos[v * 2] * scale, pos[v * 2 + 1] * scale);
+          }
+        }
+        ctx.stroke();
+      }
+
+      function step() {
+        const radius = REPEL_RADIUS * DOC.width;
+        const strength = REPEL_STRENGTH * spacing;
+        const r2 = radius * radius;
+
+        let moving = false;
+
+        for (let v = 0; v < count; v++) {
+          const ix = v * 2;
+          const iy = ix + 1;
+
+          let ax = 0;
+          let ay = 0;
+
+          if (px !== null && py !== null) {
+            // Measured from the vertex's *rest* position, not its current one.
+            //
+            // Using the live position makes the force chase the vertex it is
+            // pushing: the vertex leaves the radius, the force cuts out, the
+            // spring drags it back in, and the zone pumps itself empty. Anchoring
+            // to rest means each vertex has one fixed target offset for a given
+            // cursor position, so the field deforms and holds.
+            const dx = rest[ix] - px;
+            const dy = rest[iy] - py;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < r2 && d2 > 1e-6) {
+              const d = Math.sqrt(d2);
+              // Smooth shoulder: full push near the cursor, easing to nothing at
+              // the rim so there is no visible circular edge.
+              const t = 1 - d / radius;
+              const falloff = t * t * (3 - 2 * t);
+              const amount = strength * falloff;
+              // Target position, then spring toward *that* rather than applying a
+              // raw force. Displacement is bounded by construction, so the bulge
+              // can never open into a crater however long the cursor rests.
+              const tx = rest[ix] + (dx / d) * amount;
+              const ty = rest[iy] + (dy / d) * amount;
+              ax += (tx - pos[ix]) * SPRING;
+              ay += (ty - pos[iy]) * SPRING;
+            } else {
+              ax += (rest[ix] - pos[ix]) * SPRING;
+              ay += (rest[iy] - pos[iy]) * SPRING;
+            }
           } else {
             ax += (rest[ix] - pos[ix]) * SPRING;
             ay += (rest[iy] - pos[iy]) * SPRING;
           }
-        } else {
-          ax += (rest[ix] - pos[ix]) * SPRING;
-          ay += (rest[iy] - pos[iy]) * SPRING;
-        }
 
-        vel[ix] = (vel[ix] + ax) * DAMPING;
-        vel[iy] = (vel[iy] + ay) * DAMPING;
-        pos[ix] += vel[ix];
-        pos[iy] += vel[iy];
+          vel[ix] = (vel[ix] + ax) * DAMPING;
+          vel[iy] = (vel[iy] + ay) * DAMPING;
+          pos[ix] += vel[ix];
+          pos[iy] += vel[iy];
 
-        if (!moving) {
-          const ox = pos[ix] - rest[ix];
-          const oy = pos[iy] - rest[iy];
-          if (ox * ox + oy * oy > REST_EPSILON || vel[ix] * vel[ix] + vel[iy] * vel[iy] > REST_EPSILON) {
-            moving = true;
+          if (!moving) {
+            const ox = pos[ix] - rest[ix];
+            const oy = pos[iy] - rest[iy];
+            if (ox * ox + oy * oy > REST_EPSILON || vel[ix] * vel[ix] + vel[iy] * vel[iy] > REST_EPSILON) {
+              moving = true;
+            }
           }
         }
-      }
 
-      // Park the loop once everything is home and the pointer has left. An idle
-      // portrait should cost nothing.
-      if (!moving && px === null) {
-        // Snap to exact rest before the final draw. Parking leaves whatever
-        // sub-threshold offsets remain frozen in place, and across repeated
-        // hovers those accumulate into a visible smudge.
-        pos.set(rest);
-        vel.fill(0);
+        // Park the loop once everything is home and the pointer has left. An idle
+        // portrait should cost nothing.
+        if (!moving && px === null) {
+          // Snap to exact rest before the final draw. Parking leaves whatever
+          // sub-threshold offsets remain frozen in place, and across repeated
+          // hovers those accumulate into a visible smudge.
+          pos.set(rest);
+          vel.fill(0);
+          draw();
+          running = false;
+          return;
+        }
+
         draw();
-        running = false;
-        return;
+        raf = requestAnimationFrame(step);
       }
 
-      draw();
-      raf = requestAnimationFrame(step);
-    }
+      function kick() {
+        if (running || reduceMotion.matches) return;
+        running = true;
+        raf = requestAnimationFrame(step);
+      }
 
-    function kick() {
-      if (running || reduceMotion.matches) return;
-      running = true;
-      raf = requestAnimationFrame(step);
-    }
+      function onTheme() {
+        const next = activeTheme();
+        if (next !== theme) {
+          theme = next;
+          // Swap the rest positions in place. Velocity and current positions are
+          // left alone, so a theme change mid-hover eases into the new geometry
+          // through the spring rather than snapping.
+          rest.set(geometry[theme].rest);
+          kick();
+        }
+        draw();
+      }
 
-    function onTheme() {
-      const next = activeTheme();
-      if (next !== theme) {
-        theme = next;
-        // Swap the rest positions in place. Velocity and current positions are
-        // left alone, so a theme change mid-hover eases into the new geometry
-        // through the spring rather than snapping.
-        rest.set(geometry[theme].rest);
+      function resize() {
+        const rect = canvas!.getBoundingClientRect();
+        if (!rect.width) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        scale = rect.width / DOC.width;
+        width = rect.width;
+        height = DOC.height * scale;
+        canvas!.width = Math.round(width * dpr);
+        canvas!.height = Math.round(height * dpr);
+        canvas!.style.height = `${height}px`;
+        ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+        draw();
+      }
+
+      function toGrid(e: PointerEvent) {
+        const rect = canvas!.getBoundingClientRect();
+        px = (e.clientX - rect.left) / scale;
+        py = (e.clientY - rect.top) / scale;
+      }
+
+      function onMove(e: PointerEvent) {
+        // Coarse pointers get the static portrait: a repel effect anchored to a
+        // finger is hidden by the finger.
+        if (e.pointerType === "touch") return;
+        toGrid(e);
         kick();
       }
-      draw();
-    }
 
-    function resize() {
-      const rect = canvas!.getBoundingClientRect();
-      if (!rect.width) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      scale = rect.width / DOC.width;
-      width = rect.width;
-      height = DOC.height * scale;
-      canvas!.width = Math.round(width * dpr);
-      canvas!.height = Math.round(height * dpr);
-      canvas!.style.height = `${height}px`;
-      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-      draw();
-    }
+      function onLeave() {
+        px = null;
+        py = null;
+        kick();
+      }
 
-    function toGrid(e: PointerEvent) {
-      const rect = canvas!.getBoundingClientRect();
-      px = (e.clientX - rect.left) / scale;
-      py = (e.clientY - rect.top) / scale;
-    }
+      const observer = new ResizeObserver(resize);
+      observer.observe(canvas);
+      resize();
 
-    function onMove(e: PointerEvent) {
-      // Coarse pointers get the static portrait: a repel effect anchored to a
-      // finger is hidden by the finger.
-      if (e.pointerType === "touch") return;
-      toGrid(e);
-      kick();
-    }
-
-    function onLeave() {
-      px = null;
-      py = null;
-      kick();
-    }
-
-    const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
-    resize();
-
-    window.addEventListener("pointermove", onMove, { passive: true });
-    canvas.addEventListener("pointerleave", onLeave);
-    // Swap geometry and re-ink on theme change. The stroke colour is read at
-    // draw time, so a parked loop would otherwise keep both the old colour and
-    // the old polarity until something moved.
-    const themeObserver = new MutationObserver(onTheme);
-    themeObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["data-theme"],
+      window.addEventListener("pointermove", onMove, { passive: true });
+      canvas.addEventListener("pointerleave", onLeave);
+      // Swap geometry and re-ink on theme change. The stroke colour is read at
+      // draw time, so a parked loop would otherwise keep both the old colour and
+      // the old polarity until something moved.
+      const themeObserver = new MutationObserver(onTheme);
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
     });
     const scheme = window.matchMedia("(prefers-color-scheme: light)");
     scheme.addEventListener("change", onTheme);
 
-    return () => {
+    canvas.dataset.ready = "true";
+
+    teardown = () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
       themeObserver.disconnect();
@@ -355,12 +373,21 @@ export function Portrait({ className }: { className?: string }) {
       canvas.removeEventListener("pointerleave", onLeave);
       scheme.removeEventListener("change", onTheme);
     };
+    });
+
+    return () => {
+      cancelled = true;
+      teardown?.();
+    };
   }, []);
 
   return (
     <canvas
       ref={canvasRef}
-      className={className}
+      // The box is reserved up front so the late geometry causes no shift, and
+      // the lines fade in rather than pop once they arrive.
+      style={{ aspectRatio: `${DOC.width} / ${DOC.height}` }}
+      className={`opacity-0 transition-opacity duration-700 data-ready:opacity-100 ${className ?? ""}`}
       role="img"
       aria-label="Line-art portrait of Shashank Durgad"
     />
